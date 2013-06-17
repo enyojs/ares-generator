@@ -1,5 +1,6 @@
 {
 	"name": "ares-generator",
+	"main": "./ares-generator.js",
 	"version": "0.1.6",
 	"description": "Project-generation toolkit for the ares-ide EnyoJS IDE",
 	"keywords": ["ares-ide", "enyo"],
@@ -40,6 +41,9 @@
 	"devDependencies": {
 		"mocha": ">=1.4.2",
 		"should": ">=1.1.0"
+	},
+	"scripts" : {
+		"install" : "node ./scripts/sub-npm.js"
 	},
 	"files": [
 		"LICENSE-2.0.txt",
