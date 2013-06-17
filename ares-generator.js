@@ -20,29 +20,25 @@ var shell = require("shelljs"),
 
 	var objectCounter = 0;
 
-	// Hashmap for available templates
-	var templates = {};
-
 	function Generator(config, next) {
-		// optionnal application libraries
-		var libs = config.libs || [];
-		config.libs = libs.filter(function(lib) {
-			// Each library need to provide a unique "id",
-			// a "description" (which does not need to be
-			// unique), plus either a "zipfiles"(which is
-			// an {Array} of ZIP-files descriptor) and/or
-			// a "files" (which is an {Array} of files
-			// descriptor)
-			return lib.id && lib.description && (lib.zipfiles || lib.files);
-		});
-
 		this.config = config;
 		log.level = config.level || 'http';
 		this.objectId = objectCounter++;
-		log.verbose("Generator()", "config:", this.config);
+		var sources = {};
+		config.sources.forEach(function(source) {
+			if ((typeof source.id === 'string') && 
+			    (typeof source.type === 'string') && 
+			    (typeof source.description === 'string') &&
+			    (Array.isArray(source.files))) {
+				sources[source.id] = source;
+				log.verbose("Generator()", "loaded source:", source);
+			} else {
+				log.verbose("Generator()", "skipping incomplete source:", source);
+			}
+		});
+		this.config.sources = sources;
 
-		// TODO: Populate the repositories here (from GenZip#sentConfig() & GenZip#createRepo()).
-
+		log.info("Generator()", "config:", this.config);
 		next();
 	}
 
@@ -51,88 +47,74 @@ var shell = require("shelljs"),
 	Generator.prototype = {
 
 		/**
-		 * registerTemplates allow to add new templates to the list
-		 * of available templates
-		 * @param {Array} newTemplates: array of local templates to add.
-		 * Entries must have 'id', 'url' and 'description' properties.
+		 * List configuration: sources
 		 * @public
+		 * @param {String} type source type, in ['template', 'lib', 'webos-service', ...]
+		 * @param {Function} next commonJS callback
+		 * @param next {Error} err 
+		 * @param next {Array} sources
+		 * @item sources {Object} id
+		 * @item sources {Object} type in ['template', 'lib', 'webos-service', ...]
+		 * @item sources {Object} [version]
+		 * @item sources {Object} description
+		 * @item sources {Object} [deps]
 		 */
-		registerTemplates: function(newTemplates) {
-			newTemplates.forEach(function(entry) {
-				templates[entry.id] = entry;
+ 		getSources: function(type, next) {
+			var outSources,
+			    sources = this.config.sources,
+			    sourceIds = Object.keys(sources);
+			sourceIds = sourceIds && sourceIds.filter(function(sourceId) {
+				return type && (sources[sourceId].type === type);
 			});
-		},
-
-		/**
-		 * registerRemoteTemplates allows to fetch templates definition
-		 * thru http
-		 * @param  {string}   templatesUrl an http url referencing a json file
-		 * which contains a array of entries a 'id', 'url' and 'description' properties.
-		 * @param  {Function} next(err, status)     commonjs callback. Will be invoked with an error
-		 *               or a json array of generated filenames.
-		 * @public
-		 */
-		registerRemoteTemplates: function(templatesUrl, next) {
-			try {
-				if (templatesUrl.substr(0, 4) === 'http') {
-					var reqOptions = {
-						url: templatesUrl,
-						proxy: this.config.proxyUrl
-					};
-					// Issue an http request to get the template definition
-					log.http("GET " + templatesUrl);
-					request(reqOptions, function (error, response, body) {
-						if (!error && response.statusCode == 200) {
-							parseInsertTemplates(body, templatesUrl, next);
-						} else if (error) {
-							next(new Error("Unable to retrieve remote template definition. error=" + error));
-						} else if (response && response.statusCode >= 300) {
-							next(new Error("Unable to retrieve remote template definition. status code=" + response.statusCode));
-						} else {
-							// Should not be an error case
-						}
-					});
-				} else {
-					fs.readFile(templatesUrl, function(err, data) {
-						if (err) {
-							next(new Error("Unable to read '" + templatesUrl + "' err: " + err));
-							return;
-						}
-						parseInsertTemplates(data, templatesUrl, next);
-					});
-				}
-			} catch(err) {
-				next(err);
-			}
-		},
-
-		getConfig: function(next) {
-			var config = {};
-			config.templates = templates.map(function(template) {
+			log.verbose("Generator#getSource()", "type:", type, "sourceIds:", sourceIds);
+			outSources = sourceIds && sourceIds.map(function(sourceId) {
+				var source = sources[sourceId];
 				return {
-					id: template.id,
-					description: template.description,
-					libs: template.libs
+					type: source.type,
+					id: source.id,
+					version: source.version,
+					description: source.description,
+					deps: source.deps || []
 				};
 			});
-			config.libs = this.config.libs.map(function(lib) {
-				return {
-					id: lib.id,
-					description: lib.description
-				};
-			});
-			next(null, config);
+			next(null, outSources);
 		},
 
-		generate: function(templateId, libs, substitutions, destination, options, next) {
-			log.info("generate()", "using:",  templateId);
-			var tmpl = templates && templates[templateId];
-			if (!tmpl) {
-				next(new Error("Requested templateId (" + templateId + ") does not exist"));
-				return;
+		generate: function(sourceIds, substitutions, destination, next) {
+			log.info("generate()", "sourceIds:", sourceIds);
+			var generator = this;
+
+			// Enrich the list of option Id's by recursing into the dependencies
+			sourceIds = sourceIds || [];
+			var sourcesObject = {};
+			_addSources(sourceIds);
+
+			function _addSources(sourceIds) {
+				sourceIds.forEach((function(sourceId) {
+					if (sourcesObject[sourceId]) {
+						// option already listed: skip
+						return;
+					} else {
+						// option not yet listed: recurse
+						var source = generator.config.sources[sourceId];
+						if (source) {
+							sourcesObject[sourceId] = source;
+							source.deps = source.deps || [];
+							_addSources(source.deps);
+						}
+					}
+				}));
 			}
-			tmpl.zipfiles = tmpl.zipfiles || [];
-			tmpl.files = tmpl.files || [];
+				
+			log.verbose("generate()", "consolidated sourceIds:", Object.keys(sourcesObject));
+
+			// now that sources are uniquelly identified
+			// via object properties, convert them back
+			// into an array for iteration.
+			var sources = Object.keys(sourcesObject).map(function(sourceId) {
+				return generator.config.sources[sourceId];
+			});
+			log.silly("generate()", "sources:", sources);
 
 			// extend built-in substitutions using plugin-provided ones
 			/*
@@ -155,91 +137,60 @@ var shell = require("shelljs"),
 			 */
 			log.info("generate()", "substitutions:", substitutions);
 
-			// Process all the files
 			async.series([
-				async.forEachSeries.bind(this, tmpl.zipfiles, processZipFile.bind(this)),
-				async.forEachSeries.bind(this, tmpl.files, processFile.bind(this)),
-				async.forEachSeries.bind(this, libs, addLib.bind(this)),
-				performSubstitution.bind(this, substitutions, options, destination)
-			], notifyCaller.bind(this));
-
-			function processZipFile(item, next) {
-				log.info("generate#processZipFile()", "Processing " + item.url);
-				
-				temp.mkdir({prefix: 'com.hp.ares.gen.processZipFile'}, (function(err, zipDir) {
-					async.series([
-						unzipFile.bind(this, item, options, this.config, zipDir),
-						removeExcludedFiles.bind(this, item, options, zipDir),
-						prefix.bind(this, item, options, zipDir, destination)
-					], next);
-				}).bind(this));
-			}
-
-			function processFile(item, next) {
-				log.info("generate#processFile()", "Processing " + item.url);
-				var src = item.url,
-				    dst = path.join(destination, item.installAs);
-				log.verbose('generate#processFile()', src + ' -> ' + dst);
-				async.series([
-					mkdirp.bind(this, path.dirname(dst)),
-					copyFile.bind(this, src, dst)
-				], next);
-			}
-			
-			function addLib(libId, next) {
-				log.info("generate#addLib()", "Adding library " + libId);
-				var lib = this.config.libs..filter
-				async.series([
-					async.forEachSeries.bind(this, lib.zipfiles, processZipFile.bind(this)),
-					async.forEachSeries.bind(this, lib.files, processFile.bind(this))
-				], next);
-			}
-
-			function notifyCaller(err) {
+				async.forEachSeries.bind(generator, sources, _processSource.bind(generator)),
+				_substitute.bind(generator, substitutions, destination)
+			], function _notifyCaller(err) {
 				if (err) {
 					next(err);
 					return;
 				}
 
-				// Return the list of extracted files
+				// Return the list of extracted files (XXX: use async processing)
 				var filelist = shell.find(destination);
 				next(null, filelist);
+			});
+
+			function _processSource(source, next) {
+				log.silly("generate#_processSource()", "processing source:", source);
+				async.forEachSeries(source.files, _processFile.bind(generator), next);
+			}
+
+			function _processFile(source, next) {
+				if ((path.extname(source.url).toLowerCase() === ".zip") ||
+				    (path.extname(source.alternateUrl).toLowerCase() === ".zip")) {
+					_processZipFile(source, next);
+				} else {
+					_processSimpleFile(source, next);
+				}
+			}
+
+			function _processSimpleFile(item, next) {
+				log.info("generate#_processSimpleFile()", "Processing " + item.url);
+				var src = item.url,
+				    dst = path.join(destination, item.installAs);
+				log.verbose('generate#_processSimpleFile()', src + ' -> ' + dst);
+				async.series([
+					mkdirp.bind(generator, path.dirname(dst)),
+					copyFile.bind(generator, src, dst)
+				], next);
+			}
+
+			function _processZipFile(item, next) {
+				log.info("generate#_processZipFile()", "Processing " + item.url);
+				
+				temp.mkdir({prefix: 'com.hp.ares.gen.processZipFile'}, (function(err, zipDir) {
+					async.series([
+						_unzipFile.bind(generator, item, generator.config, zipDir),
+						_removeExcludedFiles.bind(generator, item, zipDir),
+						_prefix.bind(generator, item, zipDir, destination)
+					], next);
+				}));
 			}
 		}
 	};
 
-	// Private functions
-	
-	function parseInsertTemplates(data, templatesUrl, next) {
-		try {
-			var newTemplates = JSON.parse(data);
-
-			var base = (templatesUrl.substr(0, 4) !== 'http') && path.dirname(templatesUrl);
-
-			newTemplates.forEach(function(entry) {
-				entry.zipfiles = entry.zipfiles || [];
-				entry.zipfiles.forEach(function(zipfile) {
-					if (zipfile.url.substr(0, 4) !== 'http') {
-						zipfile.url = path.resolve(base, zipfile.url);
-					}
-				});
-
-				entry.files = entry.files || [];
-				entry.files.forEach(function(file) {
-					if (file.url.substr(0, 4) !== 'http') {
-						file.url = path.resolve(base, file.url);
-					}
-				});
-
-				templates[entry.id] = entry;
-			});
-			next(null, {done: true});
-		} catch(err) {
-			next(new Error("Unable to parse remote template definition. error=" + err.toString()));
-		}
-	}
-
-	function unzipFile(item, options, config, destination, next) {
+	function _unzipFile(item, config, destination, next) {
 		try {
 			var source = item.url;
 
@@ -252,7 +203,7 @@ var shell = require("shelljs"),
 				}
 			}
 
-			log.verbose("unzipFile", "Unzipping " + source + " to " + destination);
+			log.verbose("_unzipFile()", "Unzipping " + source + " to " + destination);
 
 			// Create an extractor to unzip the template
 			var extractor = unzip.Extract({ path: destination });
@@ -281,14 +232,14 @@ var shell = require("shelljs"),
 		}
 	}
 
-	function removeExcludedFiles(item, options, destination, next) {
+	function _removeExcludedFiles(item, destination, next) {
 		if (item.excluded) {            // TODO: move to asynchronous processing
-			log.verbose("removeExcludedFiles", "removing excluded files");
+			log.verbose("_removeExcludedFiles()", "removing excluded files");
 			shell.ls('-R', destination).forEach(function(file) {
 				item.excluded.forEach(function(pattern) {
 					var regexp = new RegExp(pattern);
 					if (regexp.test(file)) {
-						log.verbose("removeExcludedFiles", "removing: " + file);
+						log.verbose("_removeExcludedFiles()", "removing: " + file);
 						var filename = path.join(destination, file);
 						shell.rm('-rf', filename);
 					}
@@ -298,17 +249,11 @@ var shell = require("shelljs"),
 		next();
         }
 
-	function prefix(item, options, srcDir, dstDir, next) {
-		log.verbose("generate#prefix()", "item:", item);
-		if (!item.prefixToRemove && !item.prefixToAdd) {
-			log.verbose("generate#prefix()", "skipping prefix changes");
-			next();
-			return;
-		}
-
+	function _prefix(item, srcDir, dstDir, next) {
+		log.verbose("generate#_prefix()", "item:", item);
 		var src = path.join(srcDir, item.prefixToRemove);
 		var dst = path.join(dstDir, item.prefixToAdd);
-		log.verbose("generate#prefix()", "src:", src, "-> dst:", dst);
+		log.verbose("generate#_prefix()", "src:", src, "-> dst:", dst);
 
 		async.waterfall([
 			mkdirp.bind(this, dst),
@@ -317,37 +262,37 @@ var shell = require("shelljs"),
 		], next);
 
 		function _mv(files, next) {
-			log.silly("generate#prefix#_mv()", "files:", files);
+			log.silly("generate#_prefix#_mv()", "files:", files);
 			async.forEach(files, function(file, next) {
-				log.silly("generate#prefix#_mv()", file + " -> " + dst);
+				log.silly("generate#_prefix#_mv()", file + " -> " + dst);
 				fs.rename(path.join(src, file), path.join(dst, file), next);
 			}, next);
 		}
 	}
 
-	function performSubstitution(substitutions, options, workDir, next) {
-		log.verbose("performSubstitution()", "performing substitutions");
+	function _substitute(substitutions, workDir, next) {
+                // TODO: move to asynchronous processing
+		log.verbose("_substitute()", "performing substitutions");
 
-		// Apply the substitutions                  // TODO: move to asynchronous processing
+		// Apply the substitutions
 		if (substitutions) {
 			shell.ls('-R', workDir).forEach(function(file) {
 
 				substitutions.forEach(function(substit) {
 					var regexp = new RegExp(substit.fileRegexp);
 					if (regexp.test(file)) {
-						log.verbose("performSubstitution()", "substit:", substit, "on file:", file);
+						log.verbose("_substitute()", "substit:", substit, "on file:", file);
 						var filename = path.join(workDir, file);
 						if (substit.json) {
-							log.verbose("performSubstitution()", "Applying JSON substitutions to: " + file);
+							log.verbose("_substitute()", "Applying JSON substitutions to: " + file);
 							applyJsonSubstitutions(filename, substit.json);
 						}
-						//FIXME: to refactor: sed is UNIX-only, rather use Javascript's replace
 						if (substit.sed) {
-							log.verbose("performSubstitution()", "Applying SED substitutions to: " + file);
+							log.verbose("_substitute()", "Applying SED substitutions to: " + file);
 							applySedSubstitutions(filename, substit.sed);
 						}
 						if (substit.vars) {
-							log.verbose("performSubstitution()", "Applying VARS substitutions to: " + file);
+							log.verbose("_substitute()", "Applying VARS substitutions to: " + file);
 							applyVarsSubstitutions(filename, substit.vars);
 						}
 					}
@@ -358,6 +303,7 @@ var shell = require("shelljs"),
 		next();
 
 		function applyJsonSubstitutions(filename, values) {
+			// TODO: move to asynchronous processing
 			var modified = false;
 			var content = fs.readFileSync(filename);
 			content = JSON.parse(content);
@@ -374,9 +320,9 @@ var shell = require("shelljs"),
 			}
 		};
 		
-		//FIXME: to refactor: sed is UNIX-only, rather use Javascript's replace
 		function applySedSubstitutions(filename, changes) {
-			changes.forEach(function(change) {                  // TODO: move to asynchronous processing
+			// TODO: move to asynchronous processing
+			changes.forEach(function(change) {
 				shell.sed('-i', change.search, change.replace, filename);
 			});
 		};
