@@ -143,11 +143,9 @@ var shell = require("shelljs"),
 
 			async.series([
 				async.forEachSeries.bind(generator, sources, _processSource.bind(generator)),
-				_substitute.bind(generator, substitutions, destination)
+				_substitute.bind(generator, substitutions, destination),
+				_resetOptions.bind(generator)
 			], function _notifyCaller(err) {
-				// Reset generator options
-				_resetOptions();
-
 				if (err) {
 					next(err);
 					return;
@@ -195,12 +193,13 @@ var shell = require("shelljs"),
 				}));
 			}
 
-			function _resetOptions() {
+			function _resetOptions(next) {
 				var defaultOptions = {
 					existed: false,
 					overwrite: false
 				};
 				this.options = defaultOptions;
+				next();
 			}
 		},
 
