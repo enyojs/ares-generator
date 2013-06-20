@@ -37,6 +37,10 @@ var shell = require("shelljs"),
 			}
 		});
 		this.config.sources = sources;
+		this.options = {
+			existed: false,
+			overwrite: false
+		};
 
 		log.info("Generator()", "config:", this.config);
 		next();
@@ -141,6 +145,9 @@ var shell = require("shelljs"),
 				async.forEachSeries.bind(generator, sources, _processSource.bind(generator)),
 				_substitute.bind(generator, substitutions, destination)
 			], function _notifyCaller(err) {
+				// Reset generator options
+				_resetOptions();
+
 				if (err) {
 					next(err);
 					return;
@@ -187,6 +194,28 @@ var shell = require("shelljs"),
 					], next);
 				}));
 			}
+
+			function _resetOptions() {
+				var defaultOptions = {
+					existed: false,
+					overwrite: false
+				};
+				this.options = defaultOptions;
+			}
+		},
+
+		setOptions: function(opt, next) {
+			if (typeof opt != 'object') {
+				next(new Error("options '" + opt + "' is not object type"));
+				return;
+			}
+			var keys = Object.keys(opt);
+			keys.forEach(function(key) {
+				if(this.options.hasOwnProperty(key)) {
+					this.options[key] = opt[key];
+				}
+			}.bind(this));
+			next();
 		}
 	};
 
@@ -255,6 +284,20 @@ var shell = require("shelljs"),
 		var dst = path.join(dstDir, item.prefixToAdd);
 		log.verbose("generate#_prefix()", "src:", src, "-> dst:", dst);
 
+		if (this.options.existed && !this.options.overwrite && fs.existsSync(dst)) {
+			if (!item.prefixToAdd) {
+				//no prefixToAdd, ignore it to prevent a invalid overwriting.
+				next();
+				return;
+			}
+			//find uniqName & change dstDir
+			dstDir = path.join(dst, "..");
+			var files = fs.readdirSync(dstDir);
+			var baseName = path.basename(dst);
+			baseName = _findUniqName(files, baseName, 2);
+			dst = path.join(dstDir, baseName);
+		}
+
 		async.waterfall([
 			mkdirp.bind(this, dst),
 			function(data, next) { fs.readdir(src, next); },
@@ -267,6 +310,15 @@ var shell = require("shelljs"),
 				log.silly("generate#_prefix#_mv()", file + " -> " + dst);
 				fs.rename(path.join(src, file), path.join(dst, file), next);
 			}, next);
+		}
+
+		function _findUniqName(namelist, name, concatNum) {
+			var uniqName = name + concatNum.toString();
+			if (namelist.indexOf(uniqName) >= 0) {
+				return _findUniqName(namelist, name, concatNum+1);
+			} else {
+				return uniqName;
+			}
 		}
 	}
 
