@@ -1,7 +1,7 @@
 var shell = require("shelljs"),
     request = require('request'),
     fs = require("fs"),
-	rimraf = require("rimraf"),
+    rimraf = require("rimraf"),
     util = require('util'),
     path = require("path"),
     log = require('npmlog'),
@@ -260,14 +260,14 @@ var shell = require("shelljs"),
 			function(next) {
 				fs.exists(dst, function(exists) { next(null, exists); });
 			},
-			_checkRenameDst.bind(this),
+			_renameDst.bind(this),
 			mkdirp.bind(this),
 			function(data, next) { fs.readdir(src, next); },
 			_mv.bind(this),
 			_rm.bind(this, srcDir)
 		], next);
 
-		function _checkRenameDst(exist, next) {
+		function _renameDst(exist, next) {
 			if (exist && options.overwrite !== true) {
 				if (!item.prefixToAdd) { 
 					//no prefixToAdd, ignore it to prevent a invalid overwriting.
