@@ -1,6 +1,7 @@
 var shell = require("shelljs"),
     request = require('request'),
     fs = require("fs"),
+	rimraf = require("rimraf"),
     util = require('util'),
     path = require("path"),
     log = require('npmlog'),
@@ -37,10 +38,6 @@ var shell = require("shelljs"),
 			}
 		});
 		this.config.sources = sources;
-		this.options = {
-			existed: false,
-			overwrite: false
-		};
 
 		log.info("Generator()", "config:", this.config);
 		next();
@@ -84,9 +81,10 @@ var shell = require("shelljs"),
 			next(null, outSources);
 		},
 
-		generate: function(sourceIds, substitutions, destination, next) {
+		generate: function(sourceIds, substitutions, destination, options, next) {
 			log.info("generate()", "sourceIds:", sourceIds);
 			var generator = this;
+			var options = options || {};
 
 			// Enrich the list of option Id's by recursing into the dependencies
 			sourceIds = sourceIds || [];
@@ -143,8 +141,7 @@ var shell = require("shelljs"),
 
 			async.series([
 				async.forEachSeries.bind(generator, sources, _processSource.bind(generator)),
-				_substitute.bind(generator, substitutions, destination),
-				_resetOptions.bind(generator)
+				_substitute.bind(generator, substitutions, destination)
 			], function _notifyCaller(err) {
 				if (err) {
 					next(err);
@@ -188,33 +185,10 @@ var shell = require("shelljs"),
 					async.series([
 						_unzipFile.bind(generator, item, generator.config, zipDir),
 						_removeExcludedFiles.bind(generator, item, zipDir),
-						_prefix.bind(generator, item, zipDir, destination)
+						_prefix.bind(generator, item, zipDir, destination, options)
 					], next);
 				}));
 			}
-
-			function _resetOptions(next) {
-				var defaultOptions = {
-					existed: false,
-					overwrite: false
-				};
-				this.options = defaultOptions;
-				next();
-			}
-		},
-
-		setOptions: function(opt, next) {
-			if (typeof opt != 'object') {
-				next(new Error("options '" + opt + "' is not object type"));
-				return;
-			}
-			var keys = Object.keys(opt);
-			keys.forEach(function(key) {
-				if(this.options.hasOwnProperty(key)) {
-					this.options[key] = opt[key];
-				}
-			}.bind(this));
-			next();
 		}
 	};
 
@@ -277,37 +251,51 @@ var shell = require("shelljs"),
 		next();
         }
 
-	function _prefix(item, srcDir, dstDir, next) {
+	function _prefix(item, srcDir, dstDir, options, next) {
 		log.verbose("generate#_prefix()", "item:", item);
 		var src = path.join(srcDir, item.prefixToRemove);
 		var dst = path.join(dstDir, item.prefixToAdd);
 		log.verbose("generate#_prefix()", "src:", src, "-> dst:", dst);
-
-		if (this.options.existed && !this.options.overwrite && fs.existsSync(dst)) {
-			if (!item.prefixToAdd) {
-				//no prefixToAdd, ignore it to prevent a invalid overwriting.
-				next();
-				return;
-			}
-			//find uniqName & change dstDir
-			dstDir = path.join(dst, "..");
-			var files = fs.readdirSync(dstDir);
-			var baseName = path.basename(dst);
-			baseName = _findUniqName(files, baseName, 2);
-			dst = path.join(dstDir, baseName);
-		}
+		var dstExisted = fs.existsSync(dst);
 
 		async.waterfall([
-			mkdirp.bind(this, dst),
+			_checkRenameDst.bind(this, dstExisted),
+			mkdirp.bind(this),
 			function(data, next) { fs.readdir(src, next); },
-			_mv.bind(this)
+			_mv.bind(this),
+			_rm.bind(this, srcDir)
 		], next);
+
+		function _checkRenameDst(exists, next) {
+			if (exists && options.overwrite !== true) {
+				if (!item.prefixToAdd) { 
+					//no prefixToAdd, ignore it to prevent a invalid overwriting.
+					next();
+					return;
+				}
+				//find uniqName & change dstDir
+				dstDir = path.join(dst, "..");
+				var files = fs.readdirSync(dstDir);
+				var baseName = path.basename(dst);
+				baseName = _findUniqName(files, baseName, 2);
+				dst = path.join(dstDir, baseName);
+			}
+			next(null, dst);
+		}
 
 		function _mv(files, next) {
 			log.silly("generate#_prefix#_mv()", "files:", files);
 			async.forEach(files, function(file, next) {
 				log.silly("generate#_prefix#_mv()", file + " -> " + dst);
 				fs.rename(path.join(src, file), path.join(dst, file), next);
+			}, next);
+		}
+
+		function _rm(file, next) {
+			fs.exists(file, function(exists) {
+				if (exists) {
+					rimraf(file, next);
+				}
 			}, next);
 		}
 
