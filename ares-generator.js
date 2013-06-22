@@ -268,7 +268,7 @@ var shell = require("shelljs"),
 		], next);
 
 		function _renameDst(exist, next) {
-			if (exist && options.overwrite !== true) {
+			if (exist && options.overwrite === false) {
 				if (!item.prefixToAdd) { 
 					//no prefixToAdd, ignore it to prevent a invalid overwriting.
 					next();
