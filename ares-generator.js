@@ -256,18 +256,19 @@ var shell = require("shelljs"),
 		var src = path.join(srcDir, item.prefixToRemove);
 		var dst = path.join(dstDir, item.prefixToAdd);
 		log.verbose("generate#_prefix()", "src:", src, "-> dst:", dst);
-		var dstExisted = fs.existsSync(dst);
-
 		async.waterfall([
-			_checkRenameDst.bind(this, dstExisted),
+			function(next) {
+				fs.exists(dst, function(exists) { next(null, exists); });
+			},
+			_checkRenameDst.bind(this),
 			mkdirp.bind(this),
 			function(data, next) { fs.readdir(src, next); },
 			_mv.bind(this),
 			_rm.bind(this, srcDir)
 		], next);
 
-		function _checkRenameDst(exists, next) {
-			if (exists && options.overwrite !== true) {
+		function _checkRenameDst(exist, next) {
+			if (exist && options.overwrite !== true) {
 				if (!item.prefixToAdd) { 
 					//no prefixToAdd, ignore it to prevent a invalid overwriting.
 					next();
