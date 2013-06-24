@@ -1,8 +1,9 @@
+/*jshint node: true, strict: false, globalstrict: false */
+
 var shell = require("shelljs"),
     request = require('request'),
     fs = require("fs"),
     rimraf = require("rimraf"),
-    util = require('util'),
     path = require("path"),
     log = require('npmlog'),
     temp = require("temp"),
@@ -60,7 +61,7 @@ var shell = require("shelljs"),
 		 * @item sources {Object} description
 		 * @item sources {Object} [deps]
 		 */
- 		getSources: function(type, next) {
+		getSources: function(type, next) {
 			var outSources,
 			    sources = this.config.sources,
 			    sourceIds = Object.keys(sources);
@@ -84,7 +85,7 @@ var shell = require("shelljs"),
 		generate: function(sourceIds, substitutions, destination, options, next) {
 			log.info("generate()", "sourceIds:", sourceIds);
 			var generator = this;
-			var options = options || {};
+			options = options || {};
 
 			// Enrich the list of option Id's by recursing into the dependencies
 			sourceIds = sourceIds || [];
@@ -358,14 +359,14 @@ var shell = require("shelljs"),
 				var newContent = JSON.stringify(content, null, 2);
 				fs.writeFileSync(filename, newContent);         // TODO: move to asynchronous processing
 			}
-		};
+		}
 		
 		function applySedSubstitutions(filename, changes) {
 			// TODO: move to asynchronous processing
 			changes.forEach(function(change) {
 				shell.sed('-i', change.search, change.replace, filename);
 			});
-		};
+		}
 		
 		function applyVarsSubstitutions(filename, changes) {
 			// TODO: move to asynchronous processing
@@ -374,10 +375,10 @@ var shell = require("shelljs"),
 			Object.keys(changes).forEach(function(key) {
 				var value = changes[key];
 				log.silly("applyVarsSubstitutions()", "key=" + key + " -> value=" + value);
-				content = content.replace("\$\{" + key + "\}", value);
+				content = content.replace("${" + key + "}", value);
 			});
 			fs.writeFileSync(filename, content, "utf8");
-		};
+		}
 	}
 
 }());

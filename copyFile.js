@@ -1,3 +1,5 @@
+/*jshint node: true, strict: false, globalstrict: false */
+
 module.exports = copyFile;
 
 var fs = require('fs');

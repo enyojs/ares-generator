@@ -1,3 +1,5 @@
+/*jshint node: true, strict: false, globalstrict: false */
+
 var path = require('path'),
     spawn = require('child_process').spawn;
 
@@ -51,7 +53,7 @@ function run() {
 	});
 	child.on('exit', function(code, signal) {
 		if (code !== 0) {
-			console.error(msg + 'failed');
+			console.error(msg + 'failed (code=' + code + ', signal=' + signal + ')');
 			process.exit(1);
 		}
 		console.log(msg + 'ok');
