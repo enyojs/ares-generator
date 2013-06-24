@@ -1,7 +1,9 @@
+/*jshint node: true, strict: false, globalstrict: false */
+
 var shell = require("shelljs"),
     request = require('request'),
     fs = require("fs"),
-    util = require('util'),
+    rimraf = require("rimraf"),
     path = require("path"),
     log = require('npmlog'),
     temp = require("temp"),
@@ -59,7 +61,7 @@ var shell = require("shelljs"),
 		 * @item sources {Object} description
 		 * @item sources {Object} [deps]
 		 */
- 		getSources: function(type, next) {
+		getSources: function(type, next) {
 			var outSources,
 			    sources = this.config.sources,
 			    sourceIds = Object.keys(sources);
@@ -80,9 +82,10 @@ var shell = require("shelljs"),
 			next(null, outSources);
 		},
 
-		generate: function(sourceIds, substitutions, destination, next) {
+		generate: function(sourceIds, substitutions, destination, options, next) {
 			log.info("generate()", "sourceIds:", sourceIds);
 			var generator = this;
+			options = options || {};
 
 			// Enrich the list of option Id's by recursing into the dependencies
 			sourceIds = sourceIds || [];
@@ -183,7 +186,7 @@ var shell = require("shelljs"),
 					async.series([
 						_unzipFile.bind(generator, item, generator.config, zipDir),
 						_removeExcludedFiles.bind(generator, item, zipDir),
-						_prefix.bind(generator, item, zipDir, destination)
+						_prefix.bind(generator, item, zipDir, destination, options)
 					], next);
 				}));
 			}
@@ -249,17 +252,38 @@ var shell = require("shelljs"),
 		next();
         }
 
-	function _prefix(item, srcDir, dstDir, next) {
+	function _prefix(item, srcDir, dstDir, options, next) {
 		log.verbose("generate#_prefix()", "item:", item);
 		var src = path.join(srcDir, item.prefixToRemove);
 		var dst = path.join(dstDir, item.prefixToAdd);
 		log.verbose("generate#_prefix()", "src:", src, "-> dst:", dst);
-
 		async.waterfall([
-			mkdirp.bind(this, dst),
+			function(next) {
+				fs.exists(dst, function(exists) { next(null, exists); });
+			},
+			_renameDst.bind(this),
+			mkdirp.bind(this),
 			function(data, next) { fs.readdir(src, next); },
-			_mv.bind(this)
+			_mv.bind(this),
+			_rm.bind(this, srcDir)
 		], next);
+
+		function _renameDst(exist, next) {
+			if (exist && options.overwrite === false) {
+				if (!item.prefixToAdd) { 
+					//no prefixToAdd, ignore it to prevent a invalid overwriting.
+					next();
+					return;
+				}
+				//find uniqName & change dstDir
+				dstDir = path.join(dst, "..");
+				var files = fs.readdirSync(dstDir);
+				var baseName = path.basename(dst);
+				baseName = _findUniqName(files, baseName, 2);
+				dst = path.join(dstDir, baseName);
+			}
+			next(null, dst);
+		}
 
 		function _mv(files, next) {
 			log.silly("generate#_prefix#_mv()", "files:", files);
@@ -267,6 +291,23 @@ var shell = require("shelljs"),
 				log.silly("generate#_prefix#_mv()", file + " -> " + dst);
 				fs.rename(path.join(src, file), path.join(dst, file), next);
 			}, next);
+		}
+
+		function _rm(file, next) {
+			fs.exists(file, function(exists) {
+				if (exists) {
+					rimraf(file, next);
+				}
+			}, next);
+		}
+
+		function _findUniqName(namelist, name, concatNum) {
+			var uniqName = name + concatNum.toString();
+			if (namelist.indexOf(uniqName) >= 0) {
+				return _findUniqName(namelist, name, concatNum+1);
+			} else {
+				return uniqName;
+			}
 		}
 	}
 
@@ -318,14 +359,14 @@ var shell = require("shelljs"),
 				var newContent = JSON.stringify(content, null, 2);
 				fs.writeFileSync(filename, newContent);         // TODO: move to asynchronous processing
 			}
-		};
+		}
 		
 		function applySedSubstitutions(filename, changes) {
 			// TODO: move to asynchronous processing
 			changes.forEach(function(change) {
 				shell.sed('-i', change.search, change.replace, filename);
 			});
-		};
+		}
 		
 		function applyVarsSubstitutions(filename, changes) {
 			// TODO: move to asynchronous processing
@@ -334,10 +375,10 @@ var shell = require("shelljs"),
 			Object.keys(changes).forEach(function(key) {
 				var value = changes[key];
 				log.silly("applyVarsSubstitutions()", "key=" + key + " -> value=" + value);
-				content = content.replace("\$\{" + key + "\}", value);
+				content = content.replace("${" + key + "}", value);
 			});
 			fs.writeFileSync(filename, content, "utf8");
-		};
+		}
 	}
 
 }());
