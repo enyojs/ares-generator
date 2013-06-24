@@ -40,10 +40,12 @@
 	],
 	"devDependencies": {
 		"mocha": ">=1.4.2",
-		"should": ">=1.1.0"
+		"should": ">=1.1.0",
+		"jshint": ">=2.1.3"
 	},
 	"scripts" : {
-		"install" : "node ./scripts/sub-npm.js"
+		"install" : "node ./scripts/sub-npm.js",
+		"pretest" : "node ./node_modules/.bin/jshint ."
 	},
 	"files": [
 		"LICENSE-2.0.txt",
