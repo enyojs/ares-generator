@@ -49,6 +49,9 @@
 	},
 	"files": [
 		"LICENSE-2.0.txt",
-		"README.md"
+		"README.md",
+		"ares-generator.js",
+		"copyFile.js",
+		"scripts"
 	]
 }
