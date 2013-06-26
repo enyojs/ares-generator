@@ -1,7 +1,7 @@
 {
 	"name": "ares-generator",
 	"main": "./ares-generator.js",
-	"version": "0.1.6",
+	"version": "0.1.7",
 	"description": "Project-generation toolkit for the ares-ide EnyoJS IDE",
 	"keywords": ["ares-ide", "enyo"],
 	"homepage": "https://github.com/enyojs/ares-generator",
