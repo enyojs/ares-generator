@@ -240,9 +240,7 @@ var shell = require("shelljs"),
 				url: url,
 				proxy: this.config.proxyUrl
 			}).pipe(
-				fs.createWriteStream(context.archive)
-					.on('error', next)
-					.on('close', next)
+				fs.createWriteStream(context.archive).on('close', next)
 			);
 		} catch(err) {
 			next(err);
@@ -250,32 +248,11 @@ var shell = require("shelljs"),
 	}
 
 	function _unzipFile(context, next) {
-		/*
-		 * WARNING:
-		 * - node-unzip <= 0.1.4 works with Node.js 0.8 only
-		 * - `node-unzip/max-call-stack-exceeded-wip@HEAD` works with Node.js 0.10 only
-		 */
-		var extractor;
 		log.silly("Generator#_unzipFile()", context.archive, "=>", context.workDir);
 		try {
-			if (false /*NODE_V_0_8*/) {
-				log.silly("Generator#_unzipFile()", "Using Node.js 0.8 plumbing sequence");
-				extractor = unzip.Extract({ path: context.workDir });
-				fs.createReadStream(context.archive).pipe(extractor);
-				extractor.on('close', next); // works up to node-unzip@0.1.4
-			} else {
-				log.silly("Generator#_unzipFile()", "Using Node.js 0.10 plumbing sequence");
-				/*
-				fs.createReadStream(context.archive).pipe(
-					unzip.Extract({ path: context.workDir })
-						.on('error', next)
-						.on('finish', next)
-				);
-				 */
-				extractor = unzip.Extract({ path: context.workDir });
-				extractor.on('close', next);
-				fs.createReadStream(context.archive).pipe(extractor);
-			}
+			var extractor = unzip.Extract({ path: context.workDir });
+			extractor.on('close', next);
+			fs.createReadStream(context.archive).pipe(extractor);
 		} catch(err) {
 			next(err);
 		}
