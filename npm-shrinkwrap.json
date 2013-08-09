@@ -114,10 +114,6 @@
                   "from": "delayed-stream@0.0.5"
                 }
               }
-            },
-            "async": {
-              "version": "0.2.9",
-              "from": "async@~0.2.9"
             }
           }
         }
@@ -154,14 +150,20 @@
       }
     },
     "unzip": {
-      "version": "0.1.8",
-      "from": "unzip@0.1.8",
-      "resolved": "https://registry.npmjs.org/unzip/-/unzip-0.1.8.tgz",
+      "version": "0.1.7-1",
       "dependencies": {
         "fstream": {
           "version": "0.1.24",
           "from": "fstream@~0.1.21",
           "dependencies": {
+            "rimraf": {
+              "version": "2.2.2",
+              "from": "rimraf@2"
+            },
+            "mkdirp": {
+              "version": "0.3.5",
+              "from": "mkdirp@~0.3"
+            },
             "graceful-fs": {
               "version": "2.0.0",
               "from": "graceful-fs@~2.0.0"
@@ -216,11 +218,136 @@
         },
         "match-stream": {
           "version": "0.0.2",
-          "from": "match-stream@~0.0.2",
+          "from": "match-stream@git://github.com/EvanOxfeld/match-stream.git#callback-on-finish-wip",
+          "resolved": "git://github.com/EvanOxfeld/match-stream.git#070b5202a3a9250551ecab83c24f95f3bcf6a938",
           "dependencies": {
             "buffers": {
               "version": "0.1.1",
               "from": "buffers@~0.1.1"
+            }
+          }
+        },
+        "stream-buffers": {
+          "version": "0.2.5",
+          "from": "stream-buffers@~0.2.3"
+        },
+        "temp": {
+          "version": "0.4.0",
+          "from": "temp@~0.4.0"
+        },
+        "dirdiff": {
+          "version": "0.0.1",
+          "from": "dirdiff@~0.0.1",
+          "dependencies": {
+            "glob": {
+              "version": "3.1.21",
+              "from": "glob@~3.1.12",
+              "dependencies": {
+                "minimatch": {
+                  "version": "0.2.12",
+                  "from": "minimatch@~0.2.11",
+                  "dependencies": {
+                    "lru-cache": {
+                      "version": "2.3.0",
+                      "from": "lru-cache@2"
+                    },
+                    "sigmund": {
+                      "version": "1.0.0",
+                      "from": "sigmund@~1.0.0"
+                    }
+                  }
+                },
+                "graceful-fs": {
+                  "version": "1.2.3",
+                  "from": "graceful-fs@~1.2.0"
+                },
+                "inherits": {
+                  "version": "1.0.0",
+                  "from": "inherits@1"
+                }
+              }
+            }
+          }
+        },
+        "tap": {
+          "version": "0.3.3",
+          "from": "tap@~0.3.0",
+          "dependencies": {
+            "inherits": {
+              "version": "1.0.0"
+            },
+            "yamlish": {
+              "version": "0.0.5"
+            },
+            "slide": {
+              "version": "1.1.4",
+              "from": "slide@*"
+            },
+            "runforcover": {
+              "version": "0.0.2",
+              "from": "runforcover@~0.0.2",
+              "dependencies": {
+                "bunker": {
+                  "version": "0.1.2",
+                  "from": "bunker@0.1.X",
+                  "dependencies": {
+                    "burrito": {
+                      "version": "0.2.12",
+                      "from": "burrito@>=0.2.5 <0.3",
+                      "dependencies": {
+                        "traverse": {
+                          "version": "0.5.2",
+                          "from": "traverse@~0.5.1"
+                        },
+                        "uglify-js": {
+                          "version": "1.1.1",
+                          "from": "uglify-js@~1.1.1"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "nopt": {
+              "version": "2.1.2",
+              "from": "nopt@~2",
+              "dependencies": {
+                "abbrev": {
+                  "version": "1.0.4",
+                  "from": "abbrev@1"
+                }
+              }
+            },
+            "mkdirp": {
+              "version": "0.3.5",
+              "from": "mkdirp@~0.3"
+            },
+            "difflet": {
+              "version": "0.2.6",
+              "from": "difflet@~0.2.0",
+              "dependencies": {
+                "traverse": {
+                  "version": "0.6.3",
+                  "from": "traverse@0.6.x"
+                },
+                "charm": {
+                  "version": "0.1.2",
+                  "from": "charm@0.1.x"
+                },
+                "deep-is": {
+                  "version": "0.1.2",
+                  "from": "deep-is@0.1.x"
+                }
+              }
+            },
+            "deep-equal": {
+              "version": "0.0.0",
+              "from": "deep-equal@~0.0.0"
+            },
+            "buffer-equal": {
+              "version": "0.0.0",
+              "from": "buffer-equal@~0.0.0"
             }
           }
         }
