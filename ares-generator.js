@@ -197,6 +197,10 @@ var shell = require("shelljs"),
 					prefix: 'com.enyojs.ares.generator',
 					suffix: ".d"
 				}, (function(err, tmpDir) {
+					if (err) {
+						next(err);
+						return;
+					}
 					// all those dirs will be
 					// cleaned when `tmpDir` will
 					// go out of scope.
