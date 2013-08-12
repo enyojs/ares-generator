@@ -16,8 +16,6 @@ var shell = require("shelljs"),
 
 	var generator = {};
 
-	var NODE_V_0_8 = !!process.version.match('^v0.8');
-
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = generator;
 	}
