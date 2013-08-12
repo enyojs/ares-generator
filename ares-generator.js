@@ -140,6 +140,13 @@ var shell = require("shelljs"),
 			 */
 			log.info("generate()", "substitutions:", substitutions);
 
+			// Do not overwrite the target directory (as a
+			// whole) in case it already exists.
+			if (!options.overwrite && fs.existsSync(destination)) {
+				next(new Error("'" + destination + "' already exists"));
+				return;
+			}
+
 			async.series([
 				async.forEachSeries.bind(generator, sources, _processSource.bind(generator)),
 				_substitute.bind(generator, substitutions, destination)
@@ -181,109 +188,103 @@ var shell = require("shelljs"),
 
 			function _processZipFile(item, next) {
 				log.info("generate#_processZipFile()", "Processing " + item.url);
-				
-				temp.mkdir({prefix: 'com.hp.ares.gen.processZipFile'}, (function(err, zipDir) {
+				var context = {
+					item: item
+				};
+				temp.mkdir({
+					prefix: 'com.enyojs.ares.generator',
+					suffix: ".d"
+				}, (function(err, tmpDir) {
+					if (err) {
+						next(err);
+						return;
+					}
+					// all those dirs will be
+					// cleaned when `tmpDir` will
+					// go out of scope.
+					context.archive = path.join(tmpDir, "archive");
+					context.workDir = path.join(tmpDir, "work");
+					context.destDir = destination;
+
 					async.series([
-						_unzipFile.bind(generator, item, generator.config, zipDir),
-						_removeExcludedFiles.bind(generator, item, zipDir),
-						_prefix.bind(generator, item, zipDir, destination, options)
+						_fetchFile.bind(generator, context),
+						fs.mkdir.bind(this, context.workDir),
+						_unzipFile.bind(generator, context),
+						_removeExcludedFiles.bind(generator, context),
+						_prefix.bind(generator, context),
+						rimraf.bind(this, tmpDir) // otherwise cleaned-up at process exit
 					], next);
 				}));
 			}
 		}
 	};
 
-	function _unzipFile(item, config, destination, next) {
+	// This method works both on node-0.8 & node-0.10 (do not
+	// laugh, this is not easy to achieve...)
+	function _fetchFile(context, next) {
+		log.silly("Generator#_fetchFile()");
 		try {
-			var source = item.url;
+			var url = context.item.url;
 
-			if ((source.substr(0, 4) !== 'http') && ( ! fs.existsSync(source))) {
-				if (item.alternateUrl) {
-					source = item.alternateUrl;
-				} else {
-					next(new Error("File '" + source + "' does not exists"));
-					return;
-				}
+			if (fs.existsSync(url)) {
+				context.archive = url;
+				next();
+				return;
 			}
 
-			log.verbose("_unzipFile()", "Unzipping " + source + " to " + destination);
-
-			// Create an extractor to unzip the template
-			var extractor = unzip.Extract({ path: destination });
-			extractor.on('error', next);
-
-			// Building the zipStream either from a file or an http request
-			var zipStream;
-			if (source.substr(0, 4) === 'http') {
-				var reqOptions = {
-					url: source,
-					proxy: config.proxyUrl
-				};
-				log.http("GET " + source);
-				zipStream = request(reqOptions);
-			} else {
-				zipStream = fs.createReadStream(source);
+			if (url.substr(0, 4) !== 'http') {
+				next(new Error("Source '" + url + "' does not exists"));
+				return;
 			}
 
-			// Pipe the zipped content to the extractor to actually perform the unzip
-			zipStream.pipe(extractor);
-
-			// Wait for the end of the extraction
-			extractor.on('close', next);
+			log.http("Generator#_fetchFile()", "GET", url, "=>", context.archive);
+			request({
+				url: url,
+				proxy: this.config.proxyUrl
+			}).pipe(
+				fs.createWriteStream(context.archive).on('close', next)
+			);
 		} catch(err) {
 			next(err);
 		}
 	}
 
-	function _removeExcludedFiles(item, destination, next) {
-		if (item.excluded) {            // TODO: move to asynchronous processing
-			log.verbose("_removeExcludedFiles()", "removing excluded files");
-			shell.ls('-R', destination).forEach(function(file) {
-				item.excluded.forEach(function(pattern) {
-					var regexp = new RegExp(pattern);
-					if (regexp.test(file)) {
-						log.verbose("_removeExcludedFiles()", "removing: " + file);
-						var filename = path.join(destination, file);
-						shell.rm('-rf', filename);
-					}
-				});
-			});
+	function _unzipFile(context, next) {
+		log.silly("Generator#_unzipFile()", context.archive, "=>", context.workDir);
+		try {
+			var extractor = unzip.Extract({ path: context.workDir });
+			extractor.on('close', next);
+			fs.createReadStream(context.archive).pipe(extractor);
+		} catch(err) {
+			next(err);
 		}
-		next();
+	}
+
+	function _removeExcludedFiles(context, next) {
+		log.silly("Generator#_removeExcludedFiles()");
+		async.forEach(context.item.excluded || [], function(excluded, next) {
+			var f = path.join(context.workDir, excluded);
+			log.silly("Generator#_removeExcludedFiles()", "rm -rf", f);
+			rimraf(f, next);
+		}, next);
         }
 
-	function _prefix(item, srcDir, dstDir, options, next) {
-		log.verbose("generate#_prefix()", "item:", item);
-		var src = path.join(srcDir, item.prefixToRemove);
-		var dst = path.join(dstDir, item.prefixToAdd);
+	function _prefix(context, next) {
+		log.silly("generate#_prefix()", "item:", context.item);
+		var src = context.item.prefixToRemove ? path.join(context.workDir, context.item.prefixToRemove) : context.workDir;
+		var dst = context.item.prefixToAdd ? path.join(context.destDir, context.item.prefixToAdd) : context.destDir;
 		log.verbose("generate#_prefix()", "src:", src, "-> dst:", dst);
 		async.waterfall([
 			function(next) {
-				fs.exists(dst, function(exists) { next(null, exists); });
+				log.silly("generate#_prefix#mkdirp()", dst);
+				mkdirp(dst, next);
 			},
-			_renameDst.bind(this),
-			mkdirp.bind(this),
-			function(data, next) { fs.readdir(src, next); },
-			_mv.bind(this),
-			_rm.bind(this, srcDir)
+			function(data, next) {
+				log.silly("generate#_prefix#fs.readdir()", src);
+				fs.readdir(src, next);
+			},
+			_mv.bind(this)
 		], next);
-
-		function _renameDst(exist, next) {
-			if (exist && options.overwrite === false) {
-				if (!item.prefixToAdd) { 
-					//no prefixToAdd, ignore it to prevent a invalid overwriting.
-					next();
-					return;
-				}
-				//find uniqName & change dstDir
-				dstDir = path.join(dst, "..");
-				var files = fs.readdirSync(dstDir);
-				var baseName = path.basename(dst);
-				baseName = _findUniqName(files, baseName, 2);
-				dst = path.join(dstDir, baseName);
-			}
-			next(null, dst);
-		}
 
 		function _mv(files, next) {
 			log.silly("generate#_prefix#_mv()", "files:", files);
@@ -291,23 +292,6 @@ var shell = require("shelljs"),
 				log.silly("generate#_prefix#_mv()", file + " -> " + dst);
 				fs.rename(path.join(src, file), path.join(dst, file), next);
 			}, next);
-		}
-
-		function _rm(file, next) {
-			fs.exists(file, function(exists) {
-				if (exists) {
-					rimraf(file, next);
-				}
-			}, next);
-		}
-
-		function _findUniqName(namelist, name, concatNum) {
-			var uniqName = name + concatNum.toString();
-			if (namelist.indexOf(uniqName) >= 0) {
-				return _findUniqName(namelist, name, concatNum+1);
-			} else {
-				return uniqName;
-			}
 		}
 	}
 
