@@ -4,7 +4,6 @@ var path = require('path'),
     spawn = require('child_process').spawn;
 
 var submodules = [
-	'node_modules/unzip'
 ];
 
 var mwd = process.cwd();

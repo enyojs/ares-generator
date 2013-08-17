@@ -1,6 +1,7 @@
 /*jshint node: true, strict: false, globalstrict: false */
 
 var shell = require("shelljs"),
+    util = require('util'),
     request = require('request'),
     fs = require("fs"),
     rimraf = require("rimraf"),
@@ -9,7 +10,7 @@ var shell = require("shelljs"),
     temp = require("temp"),
     async = require("async"),
     mkdirp = require("mkdirp"),
-    unzip = require('unzip'),
+    nodezip = require('node-zip'),
     copyFile = require('./copyFile');
 
 (function () {
@@ -251,13 +252,45 @@ var shell = require("shelljs"),
 
 	function _unzipFile(context, next) {
 		log.silly("Generator#_unzipFile()", context.archive, "=>", context.workDir);
-		try {
-			var extractor = unzip.Extract({ path: context.workDir });
-			extractor.on('close', next);
-			fs.createReadStream(context.archive).pipe(extractor);
-		} catch(err) {
-			next(err);
-		}
+		/*
+		 * WARNING: we use `node-zip` & load the entire zip-archive in memory,
+		 * because `node-unzip@0.1.8` streams do not work in `nodejs@0.10`.
+		 * A development branch of `node-unzip@0.1.7` works on nodejs@0.10, but
+		 * not on `nodejs@0.8.x`.
+		 */
+		async.waterfall([
+			fs.readFile.bind(fs, context.archive, 'binary'),
+			function(arBuf, next) {
+				log.silly("Generator#_unzipFile()", "zip length:", arBuf.length);
+				var ar;
+				try {
+					ar = new nodezip(arBuf, { base64: false, checkCRC32: false });
+				} catch(err) {
+					next(err);
+				}
+				log.silly("Generator#_unzipFile()", 'ar:', util.inspect(Object.keys(ar)));
+				log.silly("Generator#_unzipFile()", 'ar.root:', ar.root);
+				async.forEachSeries(Object.keys(ar.files), function(fileKey, next) {
+					var file = ar.files[fileKey];
+					log.silly("Generator#_unzipFile()", "file.name:", file.name);
+					log.silly("Generator#_unzipFile()", "file.options:", file.options);
+					var fileName = path.join(context.workDir, file.name);
+					async.series([
+						mkdirp.bind(null, path.dirname(fileName)),
+						function(next) {
+							if (file.options.dir) {
+								log.silly("Generator#_unzipFile()", "mkdir", fileName);
+								fs.mkdir(fileName, next);
+							} else {
+								log.silly("Generator#_unzipFile()", "write", fileName);
+								fs.writeFile(fileName, file.data, next);
+							}
+						}
+					], next);
+				}, next);
+			}
+		], next);
+
 	}
 
 	function _removeExcludedFiles(context, next) {
