@@ -291,7 +291,7 @@ var shell = require("shelljs"),
 									encoding = 'utf8';
 								}
 								var buf = new Buffer(file.data, encoding);
-								fs.writeFile(file.name, buf, next);
+								fs.writeFile(fileName, buf, next);
 							}
 						}
 					], next);
