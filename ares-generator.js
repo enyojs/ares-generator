@@ -271,7 +271,7 @@ var shell = require("shelljs"),
 				log.silly("Generator#_unzipFile()", 'ar:', util.inspect(Object.keys(ar)));
 				log.silly("Generator#_unzipFile()", 'ar.root:', ar.root);
 				async.forEachSeries(Object.keys(ar.files), function(fileKey, next) {
-					var file = ar.files[fileKey];
+					var file = ar.files[fileKey], encoding;
 					log.silly("Generator#_unzipFile()", "file.name:", file.name);
 					log.silly("Generator#_unzipFile()", "file.options:", file.options);
 					var fileName = path.join(context.workDir, file.name);
@@ -283,14 +283,21 @@ var shell = require("shelljs"),
 								fs.mkdir(fileName, next);
 							} else {
 								log.silly("Generator#_unzipFile()", "write", fileName);
-								fs.writeFile(fileName, file.data, next);
+								if (file.options.binary) {
+									encoding = 'binary';
+								} else if (file.options.base64) {
+									encoding = 'base64';
+								} else {
+									encoding = 'utf8';
+								}
+								var buf = new Buffer(file.data, encoding);
+								fs.writeFile(file.name, buf, next);
 							}
 						}
 					], next);
 				}, next);
 			}
 		], next);
-
 	}
 
 	function _removeExcludedFiles(context, next) {
