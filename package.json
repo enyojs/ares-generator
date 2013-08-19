@@ -13,30 +13,30 @@
 		"url" : "http://github.com/enyojs/ares-generator.git"
 	},
 	"engines": {
-		"node" : "~0.10.12",
-		"npm": "~1.2"
+		"node" : ">=0.8.21",
+		"npm": ">=1.2.11"
 	},
 	"engineStrict": true,
 	"os" : [ "darwin", "linux", "win32" ],
 	"dependencies": {
 		"async": "~0.2.9",
 		"mkdirp": "~0.3.5",
+		"node-zip": "~1.0.1",
 		"npmlog": "~0.0.4",
 		"request": "~2.26.0",
 		"rimraf": "~2.2.2",
 		"shelljs": "~0.1.4",
-		"temp": "~0.5.1",
-		"unzip": "0.1.7-1"
+		"temp": "~0.5.1"
 	},
 	"bundledDependencies": [
 		"async",
 		"mkdirp",
+		"node-zip",
 		"npmlog",
 		"request",
 		"rimraf",
 		"shelljs",
-		"temp",
-		"unzip"
+		"temp"
 	],
 	"devDependencies": {
 		"mocha": "~1.4.2",
