@@ -9,6 +9,6 @@ Contribute
 ----------
 
 Before forming  a GitHub  Pull-Request (PR),  please run  the prepared
-jshint command:
+jshint command as pull-request with jshint errors will be rejected.
 
 		$ npm test
