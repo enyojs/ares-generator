@@ -1,3 +1,5 @@
+/* globals require, Buffer, process */
+
 var nodezip = require('node-zip'),
     request = require('request'),
     util = require('util'),
@@ -13,16 +15,21 @@ var url = "http://enyojs.com/archive/bootplate-2.2.0.zip",
     archive = path.basename(url);
 
 async.series([
-	/*
+	// Fetch the zip file for the test
 	function(next) {
-		request({
-			url: url,
-			proxy: process.env['https_proxy']
-		}).pipe(
-			fs.createWriteStream("bootplate-2.2.0.zip").on('close', next)
-		);
+		fs.exists(archive, function(exists) {
+			if (exists === true) {
+				next();
+			} else {
+				request({
+					url: url,
+					proxy: process.env['https_proxy']
+				}).pipe(
+					fs.createWriteStream(archive).on('close', next)
+				);
+			}
+		});
 	},
-	 */
 	function(next) {
 		async.waterfall([
 			fs.readFile.bind(fs, archive, 'binary'),
