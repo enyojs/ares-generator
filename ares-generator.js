@@ -11,6 +11,7 @@ var shell = require("shelljs"),
     async = require("async"),
     mkdirp = require("mkdirp"),
     nodezip = require('node-zip'),
+    cpr = require('cpr'),
     copyFile = require('./copyFile');
 
 (function () {
@@ -376,19 +377,23 @@ var shell = require("shelljs"),
 				mkdirp(dst, next);
 			},
 			function(data, next) {
-				log.silly("generate#_prefix#fs.readdir()", src);
-				fs.readdir(src, next);
-			},
-			_mv.bind(this)
-		], next);
-
-		function _mv(files, next) {
-			log.silly("generate#_prefix#_mv()", "files:", files);
-			async.forEach(files, function(file, next) {
-				log.silly("generate#_prefix#_mv()", file + " -> " + dst);
-				fs.rename(path.join(src, file), path.join(dst, file), next);
-			}, next);
-		}
+				log.silly("generate#_prefix#cpr()", src, "->", dst);
+				cpr(src, dst, {
+					deleteFirst: false,
+					overwrite: true
+				}, next);
+			}
+		], function(errs, filelist) {
+			log.silly("generate#_prefix()", "arguments:", arguments);
+			if (isArray(errs) && errs.length > 0) {
+				errs.forEach(function(err) {
+					log.warn("generate#_prefix#_cpr()", err.toString());
+				});
+				setImmediate(next, new Error("Unable to cp -R ... -> " + dst));
+			} else {
+				setImmediate(next, null, filelist);
+			}
+		});
 	}
 
 	function _substitute(substitutions, workDir, next) {

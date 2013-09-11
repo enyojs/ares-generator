@@ -20,6 +20,7 @@
 	"os" : [ "darwin", "linux", "win32" ],
 	"dependencies": {
 		"async": "~0.2.9",
+		"cpr": "~0.1.1",
 		"mkdirp": "~0.3.5",
 		"node-zip": "~1.0.1",
 		"npmlog": "~0.0.4",
@@ -30,6 +31,7 @@
 	},
 	"bundledDependencies": [
 		"async",
+		"cpr",
 		"mkdirp",
 		"node-zip",
 		"npmlog",
