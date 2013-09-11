@@ -164,19 +164,29 @@ var shell = require("shelljs"),
 
 			function _processSource(source, next) {
 				log.silly("generate#_processSource()", "processing source:", source);
-				async.forEachSeries(source.files, _processFile.bind(generator), next);
+				async.forEachSeries(source.files, _processSourceItem.bind(generator), next);
 			}
 
-			function _processFile(source, next) {
-				if ((path.extname(source.url).toLowerCase() === ".zip") ||
-				    (path.extname(source.alternateUrl).toLowerCase() === ".zip")) {
-					_processZipFile(source, next);
+			function _processSourceItem(item, next) {
+				if ((path.extname(item.url).toLowerCase() === ".zip") ||
+				    (path.extname(item.alternateUrl).toLowerCase() === ".zip")) {
+					_processZipFile(item, next);
 				} else {
-					_processSimpleFile(source, next);
+					fs.stat(item.url, function(err, stats) {
+						if (err) {
+							setImmediate(next, err);
+						} else if (stats.isDirectory()) {
+							_processFolder(item, next);
+						} else if (stats.isFile()){
+							_processFile(item, next);
+						} else {
+							setImmediate(next, new Error("Don't know how to handle '" + item.url + "'"));
+						}
+					});
 				}
 			}
 
-			function _processSimpleFile(item, next) {
+			function _processFile(item, next) {
 				log.info("generate#_processSimpleFile()", "Processing " + item.url);
 				var src = item.url,
 				    dst = path.join(destination, item.installAs);
@@ -216,6 +226,21 @@ var shell = require("shelljs"),
 						rimraf.bind(this, tmpDir) // otherwise cleaned-up at process exit
 					], next);
 				}));
+			}
+
+			function _processFolder(item, next) {
+				log.info("generate#_processFolder()", "Processing " + item.url);
+				var context = {
+					item: item
+				};
+
+				context.workDir = item.url;
+				context.destDir = destination;
+
+				async.series([
+					_removeExcludedFiles.bind(generator, context),
+					_prefix.bind(generator, context)
+				], next);
 			}
 		}
 	};
