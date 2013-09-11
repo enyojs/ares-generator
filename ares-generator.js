@@ -23,29 +23,57 @@ var shell = require("shelljs"),
 
 	var objectCounter = 0;
 
+	var isArray = Array.isArray || function(a) {
+		return (!!a) && (a.constructor === Array);
+	};
+	var isObject = function(a) {
+		return (!!a) && (a.constructor === Object);
+	};
+	var isString = function(a) {
+		return (!!a) && (a.constructor === String);
+	};
+
 	function Generator(config, next) {
+		if (!isObject(config)) {
+			setImmediate(next, new Error("Invalid configuration:" + config));
+			return;
+		}
+		if (!isArray(config.sources)) {
+			setImmediate(next, new Error("Invalid sources:" + config.sources));
+			return;
+		}
 		this.config = config;
-		log.level = config.level || 'http';
 		this.objectId = objectCounter++;
 		var sources = {};
-		config.sources.forEach(function(source) {
-			if ((typeof source.id === 'string') && 
-			    (typeof source.type === 'string') && 
-			    (typeof source.description === 'string') &&
-			    (Array.isArray(source.files))) {
-				sources[source.id] = source;
-				log.verbose("Generator()", "loaded source:", source);
-			} else {
-				log.verbose("Generator()", "skipping incomplete source:", source);
-			}
-		});
+		try {
+			log.silly("Generator()", "Checking config.sources:", config.sources);
+			config.sources.forEach(function(source) {
+				log.silly("Generator()", "Checking source:", source);
+				if ((isString(source.id)) && 
+				    (isString(source.type)) && 
+				    (isString(source.description)) &&
+				    (isArray(source.files))) {
+					sources[source.id] = source;
+					log.verbose("Generator()", "Loaded source:", source);
+				} else {
+					throw new Error("Incomplete source:" + util.inspect(source));
+				}
+			});
+		} catch(err) {
+			setImmediate(next, err);
+			return;
+		}
 		this.config.sources = sources;
 
-		log.info("Generator()", "config:", this.config);
-		setImmediate(next);
+		log.info("Generator()", "this:", this);
+		setImmediate(next, null, this);
 	}
 
 	generator.Generator = Generator;
+	
+	generator.create = function(config, next) {
+		return new Generator(config, next);
+	};
 
 	Generator.prototype = {
 
@@ -158,6 +186,9 @@ var shell = require("shelljs"),
 				}
 
 				// Return the list of extracted files (XXX: use async processing)
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
 				var filelist = shell.find(destination);
 				next(null, filelist);
 			});

@@ -1,7 +1,7 @@
 {
 	"name": "ares-generator",
 	"main": "./ares-generator.js",
-	"version": "0.2.3",
+	"version": "0.2.4",
 	"description": "Project-generation toolkit for the ares-ide EnyoJS IDE",
 	"keywords": ["ares-ide", "enyo"],
 	"homepage": "https://github.com/enyojs/ares-generator",
@@ -13,7 +13,7 @@
 		"url" : "http://github.com/enyojs/ares-generator.git"
 	},
 	"engines": {
-		"node" : ">=0.8.21",
+		"node": ">=0.8.21",
 		"npm": ">=1.2.11"
 	},
 	"engineStrict": true,
@@ -40,12 +40,15 @@
 	],
 	"devDependencies": {
 		"mocha": "~1.4.2",
+		"shelljs": "~0.1.4",
 		"should": "~1.1.0",
-		"jshint": "~2.1.3"
+		"jshint": "~2.1.3",
+		"nopt": "~2.1.2"
 	},
 	"scripts" : {
 		"install" : "node ./scripts/sub-npm.js",
-		"pretest" : "node ./node_modules/.bin/jshint ."
+		"pretest" : "node ./node_modules/.bin/jshint .",
+		"Xpretest": "node_modules/.bin/mocha test/generator.spec.js --level silly"
 	},
 	"files": [
 		"LICENSE-2.0.txt",
