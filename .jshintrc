@@ -1,9 +1,5 @@
 {
-    "globals": {
-        "enyo": true,
-        "$L": true,
-        "onyx": true
-    },
+    "node": true,
     "evil": false,
     "regexdash": true,
     "browser": true,
