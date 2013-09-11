@@ -42,7 +42,7 @@ var shell = require("shelljs"),
 		this.config.sources = sources;
 
 		log.info("Generator()", "config:", this.config);
-		next();
+		setImmediate(next);
 	}
 
 	generator.Generator = Generator;
@@ -197,7 +197,7 @@ var shell = require("shelljs"),
 					suffix: ".d"
 				}, (function(err, tmpDir) {
 					if (err) {
-						next(err);
+						setImmediate(next, err);
 						return;
 					}
 					// all those dirs will be
@@ -229,7 +229,7 @@ var shell = require("shelljs"),
 
 			if (fs.existsSync(url)) {
 				context.archive = url;
-				next();
+				setImmediate(next);
 				return;
 			}
 
@@ -365,7 +365,7 @@ var shell = require("shelljs"),
 			});
 		}
 
-		next();
+		setImmediate(next);
 
 		function applyJsonSubstitutions(filename, values) {
 			// TODO: move to asynchronous processing
