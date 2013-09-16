@@ -219,10 +219,10 @@ var shell = require("shelljs"),
 			}
 
 			function _processFile(item, next) {
-				log.info("generate#_processSimpleFile()", "Processing " + item.url);
+				log.info("generate#_processFile()", "Processing " + item.url);
 				var src = item.url,
 				    dst = path.join(destination, item.installAs);
-				log.verbose('generate#_processSimpleFile()', src + ' -> ' + dst);
+				log.verbose('generate#_processFile()', src + ' -> ' + dst);
 				async.series([
 					mkdirp.bind(generator, path.dirname(dst)),
 					copyFile.bind(generator, src, dst)
@@ -369,13 +369,13 @@ var shell = require("shelljs"),
         }
 
 	function _prefix(context, next) {
-		log.silly("generate#_prefix()", "item:", context.item);
+		log.silly("Generator#_prefix()", "item:", context.item);
 		var src = context.item.prefixToRemove ? path.join(context.workDir, context.item.prefixToRemove) : context.workDir;
 		var dst = context.item.prefixToAdd ? path.join(context.destDir, context.item.prefixToAdd) : context.destDir;
-		log.verbose("generate#_prefix()", "src:", src, "-> dst:", dst);
+		log.verbose("Generator#_prefix()", "src:", src, "-> dst:", dst);
 		async.waterfall([
 			function(next) {
-				log.silly("generate#_prefix#mkdirp()", dst);
+				log.silly("Generator#_prefix#mkdirp()", dst);
 				mkdirp(dst, next);
 			},
 			function(data, next) {
@@ -386,14 +386,17 @@ var shell = require("shelljs"),
 				}, next);
 			}
 		], function(errs, filelist) {
-			log.silly("generate#_prefix()", "arguments:", arguments);
+			//log.silly("Generator#_prefix()", "arguments:", arguments);
 			if (isArray(errs) && errs.length > 0) {
 				errs.forEach(function(err) {
-					log.warn("generate#_prefix#_cpr()", err.toString());
+					log.warn("Generator#_prefix()", "err:", err.toString());
 				});
 				setImmediate(next, new Error("Unable to cp -R ... -> " + dst));
+			} else if (errs) {
+				log.warn("Generator#_prefix#()", "errs:", errs.toString());
+				setImmediate(next, errs);
 			} else {
-				setImmediate(next, null, filelist);
+				setImmediate(next, null, undefined /*filelist*/ /*TODO: use this list to go async*/ );
 			}
 		});
 	}
