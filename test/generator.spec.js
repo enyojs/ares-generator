@@ -195,7 +195,7 @@ describe("Testing generator", function() {
 				description: "my-description",
 				files: [{
 					url: __dirname,
-					filterOut: "\.js$"
+					filterOut: "\\.js$"
 				}]
 			}]}),
 			function(gen, next) {
