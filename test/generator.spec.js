@@ -21,9 +21,10 @@ var shortHands = {
 	"l": "--level",
 	"v": "--level verbose"
 };
-var argv = nopt(knownOpts, shortHands, process.argv, 2 /*drop 'node' & basename*/);
+var opt = nopt(knownOpts, shortHands, process.argv, 2 /*drop 'node' & basename*/);
 log.heading = 'generator.spec';
-log.level = argv.level || 'error';
+log.level = opt.level || 'error';
+log.info("opt:", opt);
 
 var generator = require("./../ares-generator.js");
 
@@ -45,7 +46,7 @@ var badConfigs = [
 ];
 
 var configOk = {
-	"proxyUrl": argv.proxy || process.env['http_proxy'],
+	"proxyUrl": opt.proxy || process.env['http_proxy'],
 	"sources": [
 		{
 			"id": "bootplate-nightly",
@@ -170,6 +171,45 @@ describe("Testing generator", function() {
 			function(filelist, next) {
 				log.silly("t4-2", "arguments", arguments);
 				log.info("t4", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(3);
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t5", "---- ");
+	it("t5. should generate a config based on one folder (with exclusion)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					url: __dirname,
+					filterOut: "\.js$"
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t5-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t5-2", "arguments", arguments);
+				log.info("t5", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(3);
 				// XXX each item in filelist should
 				// XXX include only files & be
 				// XXX relative to the desination dir.
