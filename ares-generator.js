@@ -34,6 +34,8 @@ var shell = require("shelljs"),
 		return (!!a) && (a.constructor === String);
 	};
 
+	var dotFiles = new RegExp("(^|/|\\\\)\\.");
+
 	function Generator(config, next) {
 		if (!isObject(config)) {
 			setImmediate(next, new Error("Invalid configuration:" + config));
@@ -379,10 +381,11 @@ var shell = require("shelljs"),
 				mkdirp(dst, next);
 			},
 			function(data, next) {
-				log.silly("generate#_prefix#cpr()", src, "->", dst);
+				log.silly("Generator#_prefix#cpr()", src, "->", dst);
 				cpr(src, dst, {
 					deleteFirst: false,
-					overwrite: true
+					overwrite: true,
+					filter: _filter
 				}, next);
 			}
 		], function(errs, filelist) {
@@ -401,7 +404,12 @@ var shell = require("shelljs"),
 		});
 	}
 
+	function _filter(file) {
+		return !dotFiles.test(file);
+	}
+
 	function _substitute(substitutions, workDir, next) {
+		//log.silly("Generator#_prefix()", "arguments:", arguments);
                 // TODO: move to asynchronous processing
 		log.verbose("_substitute()", "performing substitutions");
 
