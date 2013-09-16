@@ -18,6 +18,24 @@ var shell = require("shelljs"),
 
 	var generator = {};
 
+	if (typeof setImmediate !== 'function') {
+		// 
+		// `setImmediate()` emulation for node<=0.8
+		// 
+		// WARNING: due to `Function#call` signature, we _have
+		// to_ change the _this_ context passed to `next()`.
+		//
+		generator.setImmediate = function(next) {
+			var args =  Array.prototype.slice.call(arguments);
+			args.shift(1);
+			process.nextTick(function() {
+				next.apply(null, args);
+			});
+		};
+	} else {
+		generator.setImmediate = setImmediate;
+	}
+
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = generator;
 	}
@@ -38,11 +56,11 @@ var shell = require("shelljs"),
 
 	function Generator(config, next) {
 		if (!isObject(config)) {
-			setImmediate(next, new Error("Invalid configuration:" + config));
+			generator.setImmediate(next, new Error("Invalid configuration:" + config));
 			return;
 		}
 		if (!isArray(config.sources)) {
-			setImmediate(next, new Error("Invalid sources:" + config.sources));
+			generator.setImmediate(next, new Error("Invalid sources:" + config.sources));
 			return;
 		}
 		this.config = config;
@@ -70,13 +88,13 @@ var shell = require("shelljs"),
 				}
 			});
 		} catch(err) {
-			setImmediate(next, err);
+			generator.setImmediate(next, err);
 			return;
 		}
 		this.config.sources = sources;
 
 		log.info("Generator()", "config:", util.inspect(this.config, {depth: null}));
-		setImmediate(next, null, this);
+		generator.setImmediate(next, null, this);
 	}
 
 	generator.Generator = Generator;
@@ -118,12 +136,12 @@ var shell = require("shelljs"),
 					deps: source.deps || []
 				};
 			});
-			setImmediate(next, null, outSources);
+			generator.setImmediate(next, null, outSources);
 		},
 
 		generate: function(sourceIds, substitutions, destination, options, next) {
 			log.info("generate()", "sourceIds:", sourceIds);
-			var generator = this;
+			var self = this;
 			options = options || {};
 
 			// Enrich the list of option Id's by recursing into the dependencies
@@ -138,7 +156,7 @@ var shell = require("shelljs"),
 						return;
 					} else {
 						// option not yet listed: recurse
-						var source = generator.config.sources[sourceId];
+						var source = self.config.sources[sourceId];
 						if (source) {
 							sourcesObject[sourceId] = source;
 							source.deps = source.deps || [];
@@ -154,7 +172,7 @@ var shell = require("shelljs"),
 			// via object properties, convert them back
 			// into an array for iteration.
 			var sources = Object.keys(sourcesObject).map(function(sourceId) {
-				return generator.config.sources[sourceId];
+				return self.config.sources[sourceId];
 			});
 			log.silly("generate()", "sources:", sources);
 
@@ -182,16 +200,16 @@ var shell = require("shelljs"),
 			// Do not overwrite the target directory (as a
 			// whole) in case it already exists.
 			if (!options.overwrite && fs.existsSync(destination)) {
-				setImmediate(next, new Error("'" + destination + "' already exists"));
+				generator.setImmediate(next, new Error("'" + destination + "' already exists"));
 				return;
 			}
 
 			async.series([
-				async.forEachSeries.bind(generator, sources, _processSource.bind(generator)),
-				_substitute.bind(generator, substitutions, destination)
+				async.forEachSeries.bind(self, sources, _processSource.bind(self)),
+				_substitute.bind(self, substitutions, destination)
 			], function _notifyCaller(err) {
 				if (err) {
-					setImmediate(next, err);
+					next(err);
 					return;
 				}
 
@@ -200,12 +218,12 @@ var shell = require("shelljs"),
 				// XXX include only files & be
 				// XXX relative to the desination dir.
 				var filelist = shell.find(destination);
-				setImmediate(next, null, filelist);
+				next(null, filelist);
 			});
 
 			function _processSource(source, next) {
 				log.silly("generate#_processSource()", "processing source:", source);
-				async.forEachSeries(source.files, _processSourceItem.bind(generator), next);
+				async.forEachSeries(source.files, _processSourceItem.bind(self), next);
 			}
 
 			function _processSourceItem(item, next) {
@@ -215,13 +233,13 @@ var shell = require("shelljs"),
 				} else {
 					fs.stat(item.url, function(err, stats) {
 						if (err) {
-							setImmediate(next, err);
+						next(err);
 						} else if (stats.isDirectory()) {
 							_processFolder(item, next);
 						} else if (stats.isFile()){
 							_processFile(item, next);
 						} else {
-							setImmediate(next, new Error("Don't know how to handle '" + item.url + "'"));
+							next(new Error("Don't know how to handle '" + item.url + "'"));
 						}
 					});
 				}
@@ -233,8 +251,8 @@ var shell = require("shelljs"),
 				    dst = path.join(destination, item.installAs);
 				log.verbose('generate#_processFile()', src + ' -> ' + dst);
 				async.series([
-					mkdirp.bind(generator, path.dirname(dst)),
-					copyFile.bind(generator, src, dst)
+					mkdirp.bind(self, path.dirname(dst)),
+					copyFile.bind(self, src, dst)
 				], next);
 			}
 
@@ -248,7 +266,7 @@ var shell = require("shelljs"),
 					suffix: ".d"
 				}, (function(err, tmpDir) {
 					if (err) {
-						setImmediate(next, err);
+						next(err);
 						return;
 					}
 					// all those dirs will be
@@ -259,11 +277,11 @@ var shell = require("shelljs"),
 					context.destDir = destination;
 
 					async.series([
-						_fetchFile.bind(generator, context),
+						_fetchFile.bind(self, context),
 						fs.mkdir.bind(this, context.workDir),
-						_unzipFile.bind(generator, context),
-						_removeExcludedFiles.bind(generator, context),
-						_prefix.bind(generator, context),
+						_unzipFile.bind(self, context),
+						_removeExcludedFiles.bind(self, context),
+						_prefix.bind(self, context),
 						rimraf.bind(this, tmpDir) // otherwise cleaned-up at process exit
 					], next);
 				}));
@@ -279,8 +297,8 @@ var shell = require("shelljs"),
 				context.destDir = destination;
 
 				async.series([
-					_removeExcludedFiles.bind(generator, context),
-					_prefix.bind(generator, context)
+					_removeExcludedFiles.bind(self, context),
+					_prefix.bind(self, context)
 				], next);
 			}
 		}
@@ -295,12 +313,12 @@ var shell = require("shelljs"),
 
 			if (fs.existsSync(url)) {
 				context.archive = url;
-				setImmediate(next);
+				generator.setImmediate(next);
 				return;
 			}
 
 			if (url.substr(0, 4) !== 'http') {
-				setImmediate(next, new Error("Source '" + url + "' does not exists"));
+				generator.setImmediate(next, new Error("Source '" + url + "' does not exists"));
 				return;
 			}
 
@@ -313,7 +331,7 @@ var shell = require("shelljs"),
 			);
 		} catch(err) {
 			log.error("Generator#_fetchFile()", err);
-			setImmediate(next, err);
+			generator.setImmediate(next, err);
 		}
 	}
 
@@ -333,7 +351,7 @@ var shell = require("shelljs"),
 				try {
 					ar = new nodezip(arBuf, { base64: false, checkCRC32: false });
 				} catch(err) {
-					setImmediate(next, err);
+					next(err);
 					return;
 				}
 				log.silly("Generator#_unzipFile()", 'ar:', util.inspect(Object.keys(ar)));
@@ -401,12 +419,12 @@ var shell = require("shelljs"),
 				errs.forEach(function(err) {
 					log.warn("Generator#_prefix()", "err:", err.toString());
 				});
-				setImmediate(next, new Error("Unable to cp -R ... -> " + dst));
+				next(new Error("Unable to cp -R ... -> " + dst));
 			} else if (errs) {
 				log.warn("Generator#_prefix#()", "errs:", errs.toString());
-				setImmediate(next, errs);
+				next(errs);
 			} else {
-				setImmediate(next, null, undefined /*filelist*/ /*TODO: use this list to go async*/ );
+				next(null, undefined /*filelist*/ /*TODO: use this list to go async*/ );
 			}
 		});
 	}
@@ -446,7 +464,7 @@ var shell = require("shelljs"),
 			});
 		}
 
-		setImmediate(next);
+		generator.setImmediate(next);
 
 		function applyJsonSubstitutions(filename, values) {
 			// TODO: move to asynchronous processing
