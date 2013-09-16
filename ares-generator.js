@@ -109,7 +109,7 @@ var shell = require("shelljs"),
 					deps: source.deps || []
 				};
 			});
-			next(null, outSources);
+			setImmediate(next, null, outSources);
 		},
 
 		generate: function(sourceIds, substitutions, destination, options, next) {
@@ -173,7 +173,7 @@ var shell = require("shelljs"),
 			// Do not overwrite the target directory (as a
 			// whole) in case it already exists.
 			if (!options.overwrite && fs.existsSync(destination)) {
-				next(new Error("'" + destination + "' already exists"));
+				setImmediate(next, new Error("'" + destination + "' already exists"));
 				return;
 			}
 
@@ -182,7 +182,7 @@ var shell = require("shelljs"),
 				_substitute.bind(generator, substitutions, destination)
 			], function _notifyCaller(err) {
 				if (err) {
-					next(err);
+					setImmediate(next, err);
 					return;
 				}
 
@@ -191,7 +191,7 @@ var shell = require("shelljs"),
 				// XXX include only files & be
 				// XXX relative to the desination dir.
 				var filelist = shell.find(destination);
-				next(null, filelist);
+				setImmediate(next, null, filelist);
 			});
 
 			function _processSource(source, next) {
@@ -291,7 +291,7 @@ var shell = require("shelljs"),
 			}
 
 			if (url.substr(0, 4) !== 'http') {
-				next(new Error("Source '" + url + "' does not exists"));
+				setImmediate(next, new Error("Source '" + url + "' does not exists"));
 				return;
 			}
 
@@ -303,7 +303,8 @@ var shell = require("shelljs"),
 				fs.createWriteStream(context.archive).on('close', next)
 			);
 		} catch(err) {
-			next(err);
+			log.error("Generator#_fetchFile()", err);
+			setImmediate(next, err);
 		}
 	}
 
@@ -323,7 +324,8 @@ var shell = require("shelljs"),
 				try {
 					ar = new nodezip(arBuf, { base64: false, checkCRC32: false });
 				} catch(err) {
-					next(err);
+					setImmediate(next, err);
+					return;
 				}
 				log.silly("Generator#_unzipFile()", 'ar:', util.inspect(Object.keys(ar)));
 				log.silly("Generator#_unzipFile()", 'ar.root:', ar.root);
