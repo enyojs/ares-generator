@@ -58,6 +58,13 @@ var shell = require("shelljs"),
 				    (isArray(source.files))) {
 					sources[source.id] = source;
 					log.verbose("Generator()", "Loaded source:", source);
+				} else if ((typeof source.id === 'string') && (source.type === 'null')) {
+					if (sources[source.id]) {
+						delete sources[source.id];
+						log.verbose("Generator()", "Removed source:", source.id);
+					} else {
+						throw new Error("Unable to remove source: " + source.id + " does not exist");
+					}
 				} else {
 					throw new Error("Incomplete source:" + util.inspect(source));
 				}
@@ -68,7 +75,7 @@ var shell = require("shelljs"),
 		}
 		this.config.sources = sources;
 
-		log.info("Generator()", "this:", this);
+		log.info("Generator()", "config:", util.inspect(this.config, {depth: null}));
 		setImmediate(next, null, this);
 	}
 
