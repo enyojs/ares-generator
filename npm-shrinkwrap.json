@@ -4,29 +4,35 @@
   "dependencies": {
     "async": {
       "version": "0.2.9",
-      "from": "async@0.2.9",
-      "resolved": "https://registry.npmjs.org/async/-/async-0.2.9.tgz"
+      "from": "async@0.2.9"
     },
     "cpr": {
       "version": "0.1.1",
-      "from": "cpr@",
+      "from": "https://registry.npmjs.org/cpr/-/cpr-0.1.1.tgz",
       "resolved": "https://registry.npmjs.org/cpr/-/cpr-0.1.1.tgz",
       "dependencies": {
         "graceful-fs": {
           "version": "1.2.3",
-          "from": "graceful-fs@~1.2.0"
+          "from": "graceful-fs@1.2.3"
         },
         "rimraf": {
           "version": "2.0.3",
-          "from": "rimraf@~2.0.2",
+          "from": "rimraf@2.0.3",
+          "resolved": "https://registry.npmjs.org/rimraf/-/rimraf-2.0.3.tgz",
           "dependencies": {
             "graceful-fs": {
               "version": "1.1.14",
-              "from": "graceful-fs@~1.1"
+              "from": "graceful-fs@1.1.14",
+              "resolved": "https://registry.npmjs.org/graceful-fs/-/graceful-fs-1.1.14.tgz"
             }
           }
         }
       }
+    },
+    "graceful-fs": {
+      "version": "2.0.1",
+      "from": "graceful-fs@2.0.1",
+      "resolved": "https://registry.npmjs.org/graceful-fs/-/graceful-fs-2.0.1.tgz"
     },
     "mkdirp": {
       "version": "0.3.5",
@@ -129,6 +135,7 @@
         "form-data": {
           "version": "0.1.1",
           "from": "form-data@~0.1.0",
+          "resolved": "https://registry.npmjs.org/form-data/-/form-data-0.1.1.tgz",
           "dependencies": {
             "combined-stream": {
               "version": "0.0.4",
@@ -149,7 +156,7 @@
       "from": "rimraf@2.2.2",
       "dependencies": {
         "graceful-fs": {
-          "version": "2.0.1",
+          "version": "2.0.0",
           "from": "graceful-fs@~2"
         }
       }

@@ -1,9 +1,9 @@
 /*jshint node: true, strict: false, globalstrict: false */
 
-var shell = require("shelljs"),
+var fs = require("graceful-fs"),
+    shell = require("shelljs"),
     util = require('util'),
     request = require('request'),
-    fs = require("fs"),
     rimraf = require("rimraf"),
     path = require("path"),
     log = require('npmlog'),

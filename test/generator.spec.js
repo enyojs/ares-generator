@@ -1,13 +1,9 @@
 /* global describe,it */
-var //path = require("path"),
-    url = require("url"),
-    //http = require("http"),
+var url = require("url"),
     temp = require("temp"),
-    //shell = require("shelljs"),
     log = require('npmlog'),
     nopt = require('nopt'),
     should = require("should"),
-    //request = require("request"),
     rimraf = require("rimraf"),
     util = require("util"),
     async = require("async");
