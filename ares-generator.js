@@ -331,7 +331,7 @@ var fs = require("graceful-fs"),
 
 				var _normalize;
 				if (process.platform === 'win32') {
- 					_normalize = function(p) {
+					_normalize = function(p) {
 						return p && typeof p === 'string' && p.replace(/\\/g,'/');
 					};
 				} else {
@@ -508,7 +508,7 @@ var fs = require("graceful-fs"),
 		log.silly("Generator#_removeExcludedFiles()", "output fileList:", fileList);
 		context.fileList = fileList;
 		generator.setImmediate(next);
-        }
+	}
 
 	function _prefix(context, next) {
 		log.silly("Generator#_prefix()", "item:", context.item);

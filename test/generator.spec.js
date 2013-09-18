@@ -526,7 +526,7 @@ describe("Testing generator", function() {
 				description: "my-description",
 				files: [{
 					"url": path.join(__dirname, 'data', 't5.zip'),
- 					"prefixToRemove": "dir"
+					"prefixToRemove": "dir"
 				}, {
 					"url": path.join(__dirname, 'data', 't4.zip'),
 					"prefixToAdd": "dir1"
@@ -569,8 +569,8 @@ describe("Testing generator", function() {
 				description: "my-description",
 				files: [{
 					"url": path.join(__dirname, 'data', 't8'),
- 					"prefixToRemove": "dir1",
- 					"prefixToAdd": "dir0"
+					"prefixToRemove": "dir1",
+					"prefixToAdd": "dir0"
 				}, {
 					"url": path.join(__dirname, '..', 'README.md'),
 					"installAs": "dir3/README.md"
