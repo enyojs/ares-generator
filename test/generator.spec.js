@@ -1,5 +1,6 @@
 /* global describe,it */
-var url = require("url"),
+var path = require("path"),
+    url = require("url"),
     temp = require("temp"),
     log = require('npmlog'),
     nopt = require('nopt'),
@@ -7,6 +8,8 @@ var url = require("url"),
     rimraf = require("rimraf"),
     util = require("util"),
     async = require("async");
+
+var extend = require('util')._extend;
 
 var knownOpts = {
 	"proxy": url,
@@ -45,6 +48,22 @@ var configOk = {
 	"proxyUrl": opt.proxy || process.env['http_proxy'],
 	"sources": [
 		{
+			"id": "webos-bootplate-nightly",
+			"type": "template",
+			"description": "Enyo bootplate for webOS - Nightly",
+			"files": [
+				{
+					"url": "http://nightly.enyojs.com/latest/bootplate-latest.zip",
+					"prefixToRemove": "bootplate",
+					"excluded": [
+						"bootplate/api"
+					]
+				},
+				{
+					"url": "http://enyojs.com/webos/webos-app-config.zip"
+				}
+			]
+		}, {
 			"id": "bootplate-nightly",
 			"type": "template",
 			"files": [
@@ -91,12 +110,12 @@ var configOk = {
 
 describe("Testing generator", function() {
 
-	badConfigs.forEach(function(config) {
+	badConfigs.forEach(function(config, i) {
 		log.info("t1", "---- ");
-		it("t1. should fail to instanciate a code generator", function(done) {
+		it("t1."+ i + ". should fail to instanciate a code generator", function(done) {
 			log.verbose("config:" + util.inspect(config));
 			generator.create(config, function(err, gen) {
-				log.verbose("t1", "err:", err);
+				log.verbose("t1"+ i + ".", "err:", err);
 				should.exist(err);
 				should.not.exist(gen);
 				done();
@@ -104,9 +123,18 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t2", "---- ");
-	it("t2. should instanciate a code generator (real-world config)", function(done) {
-		generator.create(configOk, function(err, gen) {
+	log.info("t2.0.", "---- ");
+	it("t2.0. should instanciate a code generator (real-world config)", function(done) {
+		generator.create(extend({}, configOk), function(err, gen) {
+			should.not.exist(err);
+			should.exist(gen);
+			done();
+		});
+	});
+
+	log.info("t2.1", "---- ");
+	it("t2.1. should re-instanciate the same code generator (real-world config)", function(done) {
+		generator.create(extend({}, configOk), function(err, gen) {
 			should.not.exist(err);
 			should.exist(gen);
 			done();
@@ -141,13 +169,14 @@ describe("Testing generator", function() {
 				next();
 			}
 		], function(err) {
+			log.silly("t3", "arguments", arguments);
 			should.not.exist(err);
 			rimraf(ctx.tmpDir, done);
 		});
 	});
 
-	log.info("t4", "---- ");
-	it("t4. should generate a config based on one folder", function(done) {
+	log.info("t4.0.", "---- ");
+	it("t4.0. should generate a config based on one folder (no exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
 			generator.create.bind(generator, {sources: [{
@@ -155,21 +184,21 @@ describe("Testing generator", function() {
 				type: "my-type",
 				description: "my-description",
 				files: [{
-					url: __dirname
+					url: path.join(__dirname, 'data', 't4')
 				}]
 			}]}),
 			function(gen, next) {
-				log.silly("t4-1", "arguments", arguments);
+				log.silly("t4.0-1", "arguments", arguments);
 				ctx.gen = gen;
 				ctx.tmpDir = temp.path({prefix: "generator.spec."});
 				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
 			},
 			function(filelist, next) {
-				log.silly("t4-2", "arguments", arguments);
-				log.info("t4", "filelist:", filelist);
+				log.silly("t4.0-2", "arguments", arguments);
+				log.info("t4.0", "filelist:", filelist);
 				should.exist(filelist);
 				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(3);
+				filelist.length.should.equal(2);
 				// XXX each item in filelist should
 				// XXX include only files & be
 				// XXX relative to the desination dir.
@@ -181,8 +210,8 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t5", "---- ");
-	it("t5. should generate a config based on one folder (with exclusion)", function(done) {
+	log.info("t4.1.", "---- ");
+	it("t4.1. should generate a config based on one folder (no exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
 			generator.create.bind(generator, {sources: [{
@@ -190,22 +219,406 @@ describe("Testing generator", function() {
 				type: "my-type",
 				description: "my-description",
 				files: [{
-					url: __dirname,
-					filterOut: "\\.js$"
+					url: path.join(__dirname, 'data', 't4'),
+					excluded: []
 				}]
 			}]}),
 			function(gen, next) {
-				log.silly("t5-1", "arguments", arguments);
+				log.silly("t4.1-1", "arguments", arguments);
 				ctx.gen = gen;
 				ctx.tmpDir = temp.path({prefix: "generator.spec."});
 				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
 			},
 			function(filelist, next) {
-				log.silly("t5-2", "arguments", arguments);
-				log.info("t5", "filelist:", filelist);
+				log.silly("t4.1-2", "arguments", arguments);
+				log.info("t4.1", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(2);
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t4.2.", "---- ");
+	it("t4.2. should generate a config based on one folder (with non-empty exclusion)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					url: path.join(__dirname, 'data', 't4'),
+					excluded: [
+						"foo.js"
+					]
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t4.2-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t4.2-2", "arguments", arguments);
+				log.info("t4.2-2", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(1);
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t5.0.", "---- ");
+	it("t5.0. should generate a config based on one sub-folder (no exclusion)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					url: path.join(__dirname, 'data', 't5')
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t5.0-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t5.0-2", "arguments", arguments);
+				log.info("t5.0", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(2);
+				filelist[0].should.equal('dir/bar.txt');
+				filelist[1].should.equal('dir/foo.js');
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t5.1.", "---- ");
+	it("t5.1. should generate a config based on one sub-folder (no exclusion, prefix removed)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					url: path.join(__dirname, 'data', 't5'),
+					prefixToRemove: "dir"
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t5.1-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t5.1-2", "arguments", arguments);
+				log.info("t5.1", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(2);
+				filelist[0].should.equal('bar.txt');
+				filelist[1].should.equal('foo.js');
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t5.2.", "---- ");
+	it("t5.2. should generate a config based on one sub-folder (no exclusion, prefix added)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					url: path.join(__dirname, 'data', 't5'),
+					prefixToAdd: "superdir"
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t5.2-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t5.2-2", "arguments", arguments);
+				log.info("t5.2", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(2);
+				filelist[0].should.equal('superdir/dir/bar.txt');
+				filelist[1].should.equal('superdir/dir/foo.js');
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t6", "---- ");
+	it("t6. should generate a project based on a single file, plus a folder (no exclusion)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					"url": path.join(__dirname, '..', 'README.md'),
+					"installAs": "README.md"
+				},{
+					url: path.join(__dirname, 'data', 't5')
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t6-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t6-2", "arguments", arguments);
+				log.info("t6-2", "filelist:", filelist);
 				should.exist(filelist);
 				filelist.should.be.an.instanceOf(Array);
 				filelist.length.should.equal(3);
+				filelist[0].should.equal('README.md');
+				filelist[1].should.equal('dir/bar.txt');
+				filelist[2].should.equal('dir/foo.js');
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t7.0", "---- ");
+	it("t7.0. should generate a project based on a single zip-file (no exclusion)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					"url": path.join(__dirname, 'data', 't5.zip')
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t7.0-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t7.0-2", "arguments", arguments);
+				log.info("t7.0-2", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(2);
+				filelist[0].should.equal('dir/bar.txt');
+				filelist[1].should.equal('dir/foo.js');
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t7.1", "---- ");
+	it("t7.1. should generate a project based on a single zip-file (no exclusion)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					"url": path.join(__dirname, 'data', 't4.zip')
+				}, {
+					"url": path.join(__dirname, 'data', 't5.zip')
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t7.1-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t7.1-2", "arguments", arguments);
+				log.info("t7.1-2", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(4);
+				filelist[0].should.equal('bar.txt');
+				filelist[1].should.equal('foo.js');
+				filelist[2].should.equal('dir/bar.txt');
+				filelist[3].should.equal('dir/foo.js');
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t7.2", "---- ");
+	it("t7.2. should generate a project based on two zip-files (no exclusion, prefixes)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					"url": path.join(__dirname, 'data', 't5.zip'),
+ 					"prefixToRemove": "dir"
+				}, {
+					"url": path.join(__dirname, 'data', 't4.zip'),
+					"prefixToAdd": "dir1"
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t7.2-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t7.2-2", "arguments", arguments);
+				log.info("t7.2-2", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(4);
+				filelist[0].should.equal('bar.txt');
+				filelist[1].should.equal('foo.js');
+				filelist[2].should.equal('dir1/bar.txt');
+				filelist[3].should.equal('dir1/foo.js');
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t8.0", "---- ");
+	it("t8.0. should generate a project based one folder & one file (exclusion, prefixes)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					"url": path.join(__dirname, 'data', 't8'),
+ 					"prefixToRemove": "dir1",
+ 					"prefixToAdd": "dir0"
+				}, {
+					"url": path.join(__dirname, '..', 'README.md'),
+					"installAs": "dir3/README.md"
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t8.0-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t8.0-2", "arguments", arguments);
+				log.info("t8.0-2", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
+				filelist.length.should.equal(3);
+				filelist[0].should.equal('dir0/dir2/bar.txt');
+				filelist[1].should.equal('dir0/dir2/foo.js');
+				filelist[2].should.equal('dir3/README.md');
+				// XXX each item in filelist should
+				// XXX include only files & be
+				// XXX relative to the desination dir.
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t10.0", "---- ");
+	it("t10.0. should generate a config based on real-world bootplate-webos", function(done) {
+		this.timeout(60000);
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, extend({}, configOk)),
+			function(gen, next) {
+				log.silly("t10.0-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["webos-bootplate-nightly"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t10.0-2", "arguments", arguments);
+				log.info("t10.0-2", "filelist:", filelist);
+				should.exist(filelist);
+				filelist.should.be.an.instanceOf(Array);
 				// XXX each item in filelist should
 				// XXX include only files & be
 				// XXX relative to the desination dir.
