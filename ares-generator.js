@@ -1,7 +1,6 @@
 /*jshint node: true, strict: false, globalstrict: false */
 
 var fs = require("graceful-fs"),
-    shell = require("shelljs"),
     util = require('util'),
     request = require('request'),
     rimraf = require("rimraf"),
@@ -11,7 +10,6 @@ var fs = require("graceful-fs"),
     async = require("async"),
     mkdirp = require("mkdirp"),
     nodezip = require('node-zip'),
-    cpr = require('cpr'),
     copyFile = require('./copyFile');
 
 (function () {
@@ -142,6 +140,11 @@ var fs = require("graceful-fs"),
 		generate: function(sourceIds, substitutions, destination, options, next) {
 			log.info("generate()", "sourceIds:", sourceIds);
 			var self = this;
+			var session = {
+				fileList: [],
+				substitutions: substitutions,
+				destination: destination
+			};
 			options = options || {};
 
 			// Enrich the list of option Id's by recursing into the dependencies
@@ -174,7 +177,7 @@ var fs = require("graceful-fs"),
 			var sources = Object.keys(sourcesObject).map(function(sourceId) {
 				return self.config.sources[sourceId];
 			});
-			log.silly("generate()", "sources:", sources);
+			log.verbose("generate()", "sources:", sources);
 
 			// extend built-in substitutions using plugin-provided ones
 			/*
@@ -204,21 +207,36 @@ var fs = require("graceful-fs"),
 				return;
 			}
 
-			async.series([
+			async.waterfall([
+				temp.mkdir.bind(null, {
+					prefix: 'com.enyojs.ares.generator.folder',
+					suffix: ".d"
+				}),
+				function(tmpDir, next) {
+					session.tmpDir = tmpDir;
+					log.silly("generate()", "session.tmpDir:", session.tmpDir);
+					generator.setImmediate(next);
+				},		
 				async.forEachSeries.bind(self, sources, _processSource.bind(self)),
-				_substitute.bind(self, substitutions, destination)
+				_substitute.bind(self, session),
+				_realize.bind(self, session),
+				function(next) {
+					rimraf(session.tmpDir, next);
+				}
 			], function _notifyCaller(err) {
 				if (err) {
-					next(err);
+					// delete tmpDir & trampoline the error
+					rimraf(session.tmpDir, function() {
+						next(err);
+					});
 					return;
 				}
-
-				// Return the list of extracted files (XXX: use async processing)
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
-				var filelist = shell.find(destination);
-				next(null, filelist);
+				// return the list of generated files,
+				// relative to the given destination
+				// folder.
+				next(null, session.fileList.map(function(file) {
+					return file.name;
+				}));
 			});
 
 			function _processSource(source, next) {
@@ -229,40 +247,54 @@ var fs = require("graceful-fs"),
 			function _processSourceItem(item, next) {
 				if ((path.extname(item.url).toLowerCase() === ".zip") ||
 				    (path.extname(item.alternateUrl).toLowerCase() === ".zip")) {
-					_processZipFile(item, next);
+					_processZipFile(item, _out);
 				} else {
 					fs.stat(item.url, function(err, stats) {
 						if (err) {
-						next(err);
+							_out(err);
 						} else if (stats.isDirectory()) {
-							_processFolder(item, next);
+							_processFolder(item, _out);
 						} else if (stats.isFile()){
-							_processFile(item, next);
+							_processFile(item, _out);
 						} else {
 							next(new Error("Don't know how to handle '" + item.url + "'"));
 						}
 					});
 				}
+
+				function _out(err, fileList) {
+					log.silly("generate#_processSourceItem#_out()", "arguments:", arguments);
+					if (err) {
+						return next(err);
+					} else {
+						log.verbose("generate#_processSourceItem#_out()", "fileList:", fileList);
+						if (Array.isArray(fileList)) {
+							// XXX here we do not replace existing entries:
+							// we append new ones to the list.
+							session.fileList = session.fileList.concat(fileList);
+						}
+						log.silly("generate#_processSource()", "session.fileList:", session.fileList);
+						next();
+					}
+				}
 			}
 
 			function _processFile(item, next) {
-				log.info("generate#_processFile()", "Processing " + item.url);
-				var src = item.url,
-				    dst = path.join(destination, item.installAs);
-				log.verbose('generate#_processFile()', src + ' -> ' + dst);
-				async.series([
-					mkdirp.bind(self, path.dirname(dst)),
-					copyFile.bind(self, src, dst)
-				], next);
+				log.info("generate#_processFile()", "Processing:", item.url);
+				generator.setImmediate(next, null, [{
+					name: item.installAs,
+					path: item.url
+				}]);
 			}
 
 			function _processZipFile(item, next) {
-				log.info("generate#_processZipFile()", "Processing " + item.url);
+				log.info("generate#_processZipFile()", "Processing:", item.url);
 				var context = {
 					item: item
 				};
 				temp.mkdir({
-					prefix: 'com.enyojs.ares.generator',
+					dir: session.tmpDir,
+					prefix: "zip",
 					suffix: ".d"
 				}, (function(err, tmpDir) {
 					if (err) {
@@ -275,31 +307,84 @@ var fs = require("graceful-fs"),
 					context.archive = path.join(tmpDir, "archive");
 					context.workDir = path.join(tmpDir, "work");
 					context.destDir = destination;
+					context.fileList = [];
 
 					async.series([
 						_fetchFile.bind(self, context),
 						fs.mkdir.bind(this, context.workDir),
 						_unzipFile.bind(self, context),
 						_removeExcludedFiles.bind(self, context),
-						_prefix.bind(self, context),
-						rimraf.bind(this, tmpDir) // otherwise cleaned-up at process exit
-					], next);
+						_prefix.bind(self, context)
+					], function _out(err) {
+						log.verbose("generate#_processZipFile#_out()", "fileList.length:", context.fileList.length);
+						log.silly("generate#_processZipFile#_out()", "fileList:", context.fileList);
+						next(err, context.fileList);
+					});
 				}));
 			}
 
 			function _processFolder(item, next) {
-				log.info("generate#_processFolder()", "Processing " + item.url);
+				log.info("generate#_processFolder()", "Processing:", item.url);
 				var context = {
 					item: item
 				};
 
+				var _normalize;
+				if (process.platform === 'win32') {
+ 					_normalize = function(p) {
+						return p && typeof p === 'string' && p.replace(/\\/g,'/');
+					};
+				} else {
+					_normalize = function(p) {
+						return p;
+					};
+				}
+
+				context.fileList = [];
 				context.workDir = item.url;
 				context.destDir = destination;
 
 				async.series([
+					_walk.bind(null, context, ".", item.url),
 					_removeExcludedFiles.bind(self, context),
 					_prefix.bind(self, context)
-				], next);
+				], function _out(err) {
+					log.verbose("generate#_processFolder#_out()", "fileList.length:", context.fileList.length);
+					log.silly("generate#_processFolder#_out()", "fileList:", context.fileList);
+					next(err, context.fileList);
+				});
+
+				function _walk(context, dirName, dirPath, next) {
+					//log.silly("generate#_processFolder#_walk()", "arguments:", arguments);
+					async.waterfall([
+						fs.readdir.bind(null, dirPath),
+						function(fileNames, next) {
+							log.silly("generate#_processFolder#_walk()", "fileNames:", fileNames, "dirPath:", dirPath);
+							async.forEach(fileNames, function(fileName, next) {
+								log.silly("generate#_processFolder#_walk()", "fileName:", fileName, "dirPath:", dirPath);
+								var filePath = path.join(dirPath, fileName);
+								async.waterfall([
+									fs.stat.bind(null, filePath),
+									function(stat, next) {
+										var name = _normalize(path.join(dirName, fileName));
+										if (stat.isFile()) {
+											context.fileList.push({name: name, path: filePath});
+											generator.setImmediate(next);
+										} else {
+											_walk(context, name, filePath, next);
+										}
+									}
+								], next);
+							}, next);
+						}
+					], function(err) {
+						if (err) {
+							return next(err);
+						}
+						log.verbose("generate#_processFolder#_walk()", "fileList:", context.fileList);
+						next();
+					});
+				}
 			}
 		}
 	};
@@ -323,6 +408,7 @@ var fs = require("graceful-fs"),
 			}
 
 			log.http("Generator#_fetchFile()", "GET", url, "=>", context.archive);
+			log.http("Generator#_fetchFile()", "using proxy:", this.config.proxyUrl);
 			request({
 				url: url,
 				proxy: this.config.proxyUrl
@@ -337,6 +423,7 @@ var fs = require("graceful-fs"),
 
 	function _unzipFile(context, next) {
 		log.silly("Generator#_unzipFile()", context.archive, "=>", context.workDir);
+		var fileList = [];
 		/*
 		 * WARNING: we use `node-zip` & load the entire zip-archive in memory,
 		 * because `node-unzip@0.1.8` streams do not work in `nodejs@0.10`.
@@ -379,129 +466,177 @@ var fs = require("graceful-fs"),
 								var buf = new Buffer(file.data, encoding);
 								fs.writeFile(fileName, buf, next);
 							}
+						},
+						function(next) {
+							if (!file.options.dir) {
+								fileList.push({	path: fileName, name: file.name });
+							}
+							generator.setImmediate(next);
 						}
 					], next);
 				}, next);
 			}
-		], next);
+		], function(err) {
+			log.silly("Generator#_unzipFile()", "fileList:", fileList);
+			context.fileList = fileList;
+			next(err);
+		});
 	}
 
 	function _removeExcludedFiles(context, next) {
-		log.silly("Generator#_removeExcludedFiles()");
-		async.forEach(context.item.excluded || [], function(excluded, next) {
-			var f = path.join(context.workDir, excluded);
-			log.silly("Generator#_removeExcludedFiles()", "rm -rf", f);
-			rimraf(f, next);
-		}, next);
+		var fileList = context.fileList;
+		log.silly("Generator#_removeExcludedFiles()", "input fileList:", fileList);
+		fileList = fileList.filter(function(file) {
+
+			var skip = false;
+			if (dotFiles.test(file.name)) {
+				skip = true;
+			}
+
+			var excluded = context.item.excluded;
+			log.silly("Generator#_removeExcludedFiles()", "excluded:", excluded);
+			if (!skip && Array.isArray(excluded)) {
+				excluded.forEach(function(exclude) {
+					var len = exclude.len;
+					skip = skip || (file.name.substr(0, len) === exclude);
+					log.silly("Generator#_removeExcludedFiles()", "skip:", skip, file.name);
+				});
+			}
+
+			return !skip;
+		});
+		log.silly("Generator#_removeExcludedFiles()", "output fileList:", fileList);
+		context.fileList = fileList;
+		generator.setImmediate(next);
         }
 
 	function _prefix(context, next) {
 		log.silly("Generator#_prefix()", "item:", context.item);
-		var src = context.item.prefixToRemove ? path.join(context.workDir, context.item.prefixToRemove) : context.workDir;
-		var dst = context.item.prefixToAdd ? path.join(context.destDir, context.item.prefixToAdd) : context.destDir;
-		log.verbose("Generator#_prefix()", "src:", src, "-> dst:", dst);
-		async.waterfall([
-			function(next) {
-				log.silly("Generator#_prefix#mkdirp()", dst);
-				mkdirp(dst, next);
-			},
-			function(data, next) {
-				log.silly("Generator#_prefix#cpr()", src, "->", dst);
-				cpr(src, dst, {
-					deleteFirst: false,
-					overwrite: true,
-					filter: _filter
-				}, next);
-			}
-		], function(errs, filelist) {
-			//log.silly("Generator#_prefix()", "arguments:", arguments);
-			if (isArray(errs) && errs.length > 0) {
-				errs.forEach(function(err) {
-					log.warn("Generator#_prefix()", "err:", err.toString());
-				});
-				next(new Error("Unable to cp -R ... -> " + dst));
-			} else if (errs) {
-				log.warn("Generator#_prefix#()", "errs:", errs.toString());
-				next(errs);
-			} else {
-				next(null, undefined /*filelist*/ /*TODO: use this list to go async*/ );
-			}
-		});
-	}
+		log.silly("Generator#_prefix()", "input fileList:", context.fileList);
+		var len, fileList = context.fileList,
+		    prefixToRemove = context.item.prefixToRemove,
+		    prefixToAdd = context.item.prefixToAdd;
 
-	function _filter(file) {
-		return !dotFiles.test(file);
-	}
-
-	function _substitute(substitutions, workDir, next) {
-		//log.silly("Generator#_prefix()", "arguments:", arguments);
-                // TODO: move to asynchronous processing
-		log.verbose("_substitute()", "performing substitutions");
-
-		// Apply the substitutions
-		if (substitutions) {
-			shell.ls('-R', workDir).forEach(function(file) {
-
-				substitutions.forEach(function(substit) {
-					var regexp = new RegExp(substit.fileRegexp);
-					if (regexp.test(file)) {
-						log.verbose("_substitute()", "substit:", substit, "on file:", file);
-						var filename = path.join(workDir, file);
-						if (substit.json) {
-							log.verbose("_substitute()", "Applying JSON substitutions to: " + file);
-							applyJsonSubstitutions(filename, substit.json);
-						}
-						if (substit.sed) {
-							log.verbose("_substitute()", "Applying SED substitutions to: " + file);
-							applySedSubstitutions(filename, substit.sed);
-						}
-						if (substit.vars) {
-							log.verbose("_substitute()", "Applying VARS substitutions to: " + file);
-							applyVarsSubstitutions(filename, substit.vars);
-						}
-					}
-				});
-			});
-		}
-
-		generator.setImmediate(next);
-
-		function applyJsonSubstitutions(filename, values) {
-			// TODO: move to asynchronous processing
-			var modified = false;
-			var content = fs.readFileSync(filename);
-			content = JSON.parse(content);
-			var keys = Object.keys(values);
-			keys.forEach(function(key) {
-				if (content.hasOwnProperty(key)) {
-					content[key] = values[key];
-					modified = true;
+		// filter-out files whose name starts by `prefixToRemove`
+		if (prefixToRemove && Array.isArray(fileList)) {
+			prefixToRemove += '/';
+			len = prefixToRemove.length;
+			fileList = fileList.map(function(file) {
+				if (file.name.substr(0, len) === prefixToRemove) {
+					var newName = file.name.substr(len);
+					log.silly("Generator#_prefix()", file.name, "->", newName);
+					file.name = newName;
+					return file;
+				} else {
+					return undefined;
 				}
 			});
-			if (modified) {
-				var newContent = JSON.stringify(content, null, 2);
-				fs.writeFileSync(filename, newContent);         // TODO: move to asynchronous processing
-			}
-		}
-		
-		function applySedSubstitutions(filename, changes) {
-			// TODO: move to asynchronous processing
-			changes.forEach(function(change) {
-				shell.sed('-i', change.search, change.replace, filename);
+			fileList = fileList.filter(function(file) {
+				return !!file;
 			});
 		}
-		
-		function applyVarsSubstitutions(filename, changes) {
-			// TODO: move to asynchronous processing
-			log.verbose("applyVarsSubstitutions()", "substituting variables in '" + filename + "'");
-			var content = fs.readFileSync(filename, "utf8" /*force String return*/);
-			Object.keys(changes).forEach(function(key) {
-				var value = changes[key];
-				log.silly("applyVarsSubstitutions()", "key=" + key + " -> value=" + value);
-				content = content.replace("${" + key + "}", value);
+
+		// relocate every file name under `prefixToAdd`
+		if (prefixToAdd && Array.isArray(fileList)) {
+			prefixToAdd += '/';
+			fileList = fileList.map(function(file) {
+				var newName = prefixToAdd + file.name;
+				log.silly("Generator#_prefix()", file.name, "->", newName);
+				file.name = newName;
+				return file;
 			});
-			fs.writeFileSync(filename, content, "utf8");
+		}
+
+		// put back into the context
+		log.silly("Generator#_prefix()", "output fileList:", fileList);
+		context.fileList = fileList;
+		generator.setImmediate(next);
+	}
+
+	function _substitute(session, next) {
+		//log.silly("Generator#_substitute()", "arguments:", arguments);
+		var substits = session.substitutions;
+		log.verbose("_substitute()", "input fileList.length:", session.fileList.length);
+		log.verbose("_substitute()", "substits:", substits);
+
+		if (!Array.isArray(substits)) {
+			return generator.setImmediate(next);
+		}
+
+		async.forEachSeries(substits, function(substit, next) {
+			var regexp = new RegExp(substit.fileRegexp);
+			session.fileList.forEach(function(file) {
+				if (regexp.test(file)) {
+					log.verbose("_substitute()", "substit:", substit, "on file:", file);
+					if (substit.json) {
+						log.verbose("_substitute()", "Applying JSON substitutions to: " + file);
+						_applyJsonSubstitutions(file, substit.json);
+					}
+					if (substit.vars) {
+						log.verbose("_substitute()", "Applying VARS substitutions to: " + file);
+						_applyVarsSubstitutions(file, substit.vars);
+					}
+				}
+			});
+		}, next);
+
+		function _applyJsonSubstitutions(file, values, next) {
+			log.verbose("_applyJsonSubstitutions()", "substituting JSON in", file.name);
+			async.waterfall([
+				fs.readFile.bind(file.path, {encoding: 'utf8'}),
+				function(content, next) {
+					content = JSON.parse(content);
+					var modified, keys = Object.keys(values);
+					keys.forEach(function(key) {
+						if (content.hasOwnProperty(key)) {
+							log.verbose("_applyJsonSubstitutions()", "apply", key, ":", values[key]);
+							content[key] = values[key];
+							modified = true;
+						}
+					});
+					if (modified) {
+						file.path = temp.path({dir: session.tmpDir});
+						fs.writeFile(file.path, JSON.stringify(content, null, 2), {encoding: 'utf8'}, next);
+					} else {
+						generator.setImmediate(next);
+					}
+				}
+			], next);
+		}
+		
+		function _applyVarsSubstitutions(file, changes, next) {
+			log.verbose("_applyVarsSubstitutions()", "substituting variables in", file.name);
+			async.waterfall([
+				fs.readFile.bind(file.path, {encoding: 'utf-8'}),
+				function(content, next) {
+					Object.keys(changes).forEach(function(key) {
+						var value = changes[key];
+						log.silly("_applyVarsSubstitutions()", "key=" + key + " -> value=" + value);
+						content = content.replace("${" + key + "}", value);
+					});
+					file.path = temp.path({dir: session.tmpDir});
+					fs.writeFile(file.path, JSON.stringify(content, null, 2), {encoding: 'utf8'}, next);
+				}
+			], next);
 		}
 	}
 
+	function _realize(session, next) {
+		var dstDir = session.destination,
+		    fileList = session.fileList;
+		log.info("generate#_realize()", "dstDir:", dstDir, "fileList.length:", fileList.length);
+		log.silly("generate#_realize()", "fileList:", fileList);
+		if (dstDir) {
+			async.forEachSeries(fileList, function(file, next) {
+				var dst = path.join(dstDir, file.name);
+				log.verbose('generate#_realize()', dst, "<-", file.path);
+				async.series([
+					mkdirp.bind(null, path.dirname(dst)),
+					copyFile.bind(null, file.path, dst)
+				], next);
+			}, next);
+		} else {
+			generator.setImmediate(next);
+		}
+	}
 }());
