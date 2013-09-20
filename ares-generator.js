@@ -267,13 +267,12 @@ var fs = require("graceful-fs"),
 					if (err) {
 						return next(err);
 					} else {
-						log.verbose("generate#_processSourceItem#_out()", "fileList:", fileList);
+						log.silly("generate#_processSourceItem#_out()", "fileList:", fileList);
 						if (Array.isArray(fileList)) {
 							// XXX here we do not replace existing entries:
 							// we append new ones to the list.
 							session.fileList = session.fileList.concat(fileList);
 						}
-						log.silly("generate#_processSource()", "session.fileList:", session.fileList);
 						next();
 					}
 				}
@@ -359,9 +358,9 @@ var fs = require("graceful-fs"),
 					async.waterfall([
 						fs.readdir.bind(null, dirPath),
 						function(fileNames, next) {
-							log.silly("generate#_processFolder#_walk()", "fileNames:", fileNames, "dirPath:", dirPath);
+							//log.silly("generate#_processFolder#_walk()", "fileNames:", fileNames, "dirPath:", dirPath);
 							async.forEach(fileNames, function(fileName, next) {
-								log.silly("generate#_processFolder#_walk()", "fileName:", fileName, "dirPath:", dirPath);
+								//log.silly("generate#_processFolder#_walk()", "fileName:", fileName, "dirPath:", dirPath);
 								var filePath = path.join(dirPath, fileName);
 								async.waterfall([
 									fs.stat.bind(null, filePath),
@@ -381,7 +380,8 @@ var fs = require("graceful-fs"),
 						if (err) {
 							return next(err);
 						}
-						log.verbose("generate#_processFolder#_walk()", "fileList:", context.fileList);
+						log.silly("generate#_processFolder#_walk()", "fileList.length:", context.fileList.length);
+						//log.silly("generate#_processFolder#_walk()", "fileList:", context.fileList);
 						next();
 					});
 				}
@@ -486,23 +486,25 @@ var fs = require("graceful-fs"),
 	function _removeExcludedFiles(context, next) {
 		var fileList = context.fileList;
 		log.silly("Generator#_removeExcludedFiles()", "input fileList:", fileList);
+
+		var excluded = context.item.excluded;
+		log.verbose("Generator#_removeExcludedFiles()", "excluded:", excluded);
+
 		fileList = fileList.filter(function(file) {
-
 			var skip = false;
-			if (dotFiles.test(file.name)) {
+			// Skipping dotfiles can lead to un-expected
+			// effetcts in node sub-modules...
+			if (false /*dotFiles.test(file.name)*/) {
 				skip = true;
-			}
-
-			var excluded = context.item.excluded;
-			log.silly("Generator#_removeExcludedFiles()", "excluded:", excluded);
-			if (!skip && Array.isArray(excluded)) {
+			} else if (!skip && Array.isArray(excluded)) {
 				excluded.forEach(function(exclude) {
-					var len = exclude.len;
+					var len = exclude.length;
 					skip = skip || (file.name.substr(0, len) === exclude);
-					log.silly("Generator#_removeExcludedFiles()", "skip:", skip, file.name);
 				});
 			}
-
+			if (skip) {
+				log.verbose("Generator#_removeExcludedFiles()", "skipping:", file.name);
+			}
 			return !skip;
 		});
 		log.silly("Generator#_removeExcludedFiles()", "output fileList:", fileList);
@@ -555,47 +557,49 @@ var fs = require("graceful-fs"),
 
 	function _substitute(session, next) {
 		//log.silly("Generator#_substitute()", "arguments:", arguments);
-		var substits = session.substitutions;
+		var substits = session.substitutions || [];
 		log.verbose("_substitute()", "input fileList.length:", session.fileList.length);
 		log.verbose("_substitute()", "substits:", substits);
 
-		if (!Array.isArray(substits)) {
-			return generator.setImmediate(next);
-		}
-
 		async.forEachSeries(substits, function(substit, next) {
+			log.silly("_substitute()", "applying substit:", substit);
 			var regexp = new RegExp(substit.fileRegexp);
 			session.fileList.forEach(function(file) {
-				if (regexp.test(file)) {
-					log.verbose("_substitute()", "substit:", substit, "on file:", file);
+				log.silly("_substitute()", regexp, "matching? file.name:", file.name);
+				if (regexp.test(file.name)) {
+					log.verbose("_substitute()", "matched file:", file);
 					if (substit.json) {
-						log.verbose("_substitute()", "Applying JSON substitutions to: " + file);
-						_applyJsonSubstitutions(file, substit.json);
+						log.verbose("_substitute()", "Applying JSON substitutions to:", file);
+						_applyJsonSubstitutions(file, substit.json, next);
 					}
 					if (substit.vars) {
-						log.verbose("_substitute()", "Applying VARS substitutions to: " + file);
-						_applyVarsSubstitutions(file, substit.vars);
+						log.verbose("_substitute()", "Applying VARS substitutions to", file);
+						_applyVarsSubstitutions(file, substit.vars, next);
 					}
 				}
 			});
 		}, next);
 
-		function _applyJsonSubstitutions(file, values, next) {
-			log.verbose("_applyJsonSubstitutions()", "substituting JSON in", file.name);
+		function _applyJsonSubstitutions(file, json, next) {
+			log.verbose("_applyJsonSubstitutions()", "substituting json:", json, "in", file);
 			async.waterfall([
-				fs.readFile.bind(file.path, {encoding: 'utf8'}),
+				fs.readFile.bind(null, file.path, {encoding: 'utf8'}),
 				function(content, next) {
+					log.silly("_applyJsonSubstitutions()", "loaded JSON string:", content);
 					content = JSON.parse(content);
-					var modified, keys = Object.keys(values);
+					log.silly("_applyJsonSubstitutions()", "content:", content);
+					var modified, keys = Object.keys(json);
 					keys.forEach(function(key) {
 						if (content.hasOwnProperty(key)) {
-							log.verbose("_applyJsonSubstitutions()", "apply", key, ":", values[key]);
-							content[key] = values[key];
+							log.verbose("_applyJsonSubstitutions()", "apply", key, ":", json[key]);
+							content[key] = json[key];
 							modified = true;
 						}
 					});
+					log.silly("_applyJsonSubstitutions()", "modified:", modified, "content:", content);
 					if (modified) {
-						file.path = temp.path({dir: session.tmpDir});
+						file.path = temp.path({dir: session.tmpDir, prefix: "subst.json."});
+						log.silly("_applyJsonSubstitutions()", "update as file:", file);
 						fs.writeFile(file.path, JSON.stringify(content, null, 2), {encoding: 'utf8'}, next);
 					} else {
 						generator.setImmediate(next);
@@ -605,16 +609,16 @@ var fs = require("graceful-fs"),
 		}
 		
 		function _applyVarsSubstitutions(file, changes, next) {
-			log.verbose("_applyVarsSubstitutions()", "substituting variables in", file.name);
+			log.verbose("_applyVarsSubstitutions()", "substituting variables in", file);
 			async.waterfall([
-				fs.readFile.bind(file.path, {encoding: 'utf-8'}),
+				fs.readFile.bind(null, file.path, {encoding: 'utf-8'}),
 				function(content, next) {
 					Object.keys(changes).forEach(function(key) {
 						var value = changes[key];
 						log.silly("_applyVarsSubstitutions()", "key=" + key + " -> value=" + value);
 						content = content.replace("${" + key + "}", value);
 					});
-					file.path = temp.path({dir: session.tmpDir});
+					file.path = temp.path({dir: session.tmpDir, prefix: "subst.vars."});
 					fs.writeFile(file.path, JSON.stringify(content, null, 2), {encoding: 'utf8'}, next);
 				}
 			], next);
@@ -624,12 +628,11 @@ var fs = require("graceful-fs"),
 	function _realize(session, next) {
 		var dstDir = session.destination,
 		    fileList = session.fileList;
-		log.info("generate#_realize()", "dstDir:", dstDir, "fileList.length:", fileList.length);
-		log.silly("generate#_realize()", "fileList:", fileList);
+		log.verbose("generate#_realize()", "dstDir:", dstDir, "fileList.length:", fileList.length);
 		if (dstDir) {
 			async.forEachSeries(fileList, function(file, next) {
 				var dst = path.join(dstDir, file.name);
-				log.verbose('generate#_realize()', dst, "<-", file.path);
+				log.silly('generate#_realize()', dst, "<-", file.path);
 				async.series([
 					mkdirp.bind(null, path.dirname(dst)),
 					copyFile.bind(null, file.path, dst)

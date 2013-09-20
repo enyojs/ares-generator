@@ -1,5 +1,6 @@
 /* global describe,it */
 var path = require("path"),
+    fs = require("graceful-fs"),
     url = require("url"),
     temp = require("temp"),
     log = require('npmlog'),
@@ -13,10 +14,12 @@ var extend = require('util')._extend;
 
 var knownOpts = {
 	"proxy": url,
+	"app": path,
 	"level": ['silly', 'verbose', 'info', 'http', 'warn', 'error']
 };
 var shortHands = {
 	"p": "--proxy",
+	"a": "--app",
 	"l": "--level",
 	"v": "--level verbose"
 };
@@ -56,7 +59,10 @@ var configOk = {
 					"url": "http://nightly.enyojs.com/latest/bootplate-latest.zip",
 					"prefixToRemove": "bootplate",
 					"excluded": [
-						"bootplate/api"
+						"bootplate/api/",
+						"bootplate/build/",
+						"bootplate/deploy/",
+						"bootplate/enyo/tools/"
 					]
 				},
 				{
@@ -71,7 +77,10 @@ var configOk = {
 					"url": "http://nightly.enyojs.com/latest/bootplate-latest.zip",
 					"prefixToRemove": "bootplate",
 					"excluded": [
-						"bootplate/api"
+						"bootplate/api/",
+						"bootplate/build/",
+						"bootplate/deploy/",
+						"bootplate/enyo/tools/"
 					]
 				}
 			],
@@ -85,7 +94,10 @@ var configOk = {
 					"url": "http://enyojs.com/archive/bootplate-2.2.0.zip",
 					"prefixToRemove": "bootplate",
 					"excluded": [
-						"bootplate/api"
+						"bootplate/api/",
+						"bootplate/build/",
+						"bootplate/deploy/",
+						"bootplate/enyo/tools/"
 					]
 				}
 			],
@@ -99,7 +111,10 @@ var configOk = {
 					"url": "http://enyojs.com/archive/bootplate-2.1.1.zip",
 					"prefixToRemove": "bootplate",
 					"excluded": [
-						"bootplate/api"
+						"bootplate/api/",
+						"bootplate/build/",
+						"bootplate/deploy/",
+						"bootplate/enyo/tools/"
 					]
 				}
 			],
@@ -107,6 +122,19 @@ var configOk = {
 		}
 	]
 };
+
+function checkFileList(prefix, val, expected) {
+	should.exist(val);
+	val.should.be.an.instanceOf(Array);
+	val.sort();
+	expected.sort();
+	log.verbose(prefix, "val.length:", val.length, "expected.length:", expected.length);
+	val.forEach(function(f, i) {
+		should.exist(f);
+		f.should.be.a('string');
+		f.should.equal(expected[i]);
+	});
+}
 
 describe("Testing generator", function() {
 
@@ -162,10 +190,8 @@ describe("Testing generator", function() {
 			},
 			function(filelist, next) {
 				log.silly("t3-2", "arguments", arguments);
-				log.info("t3", "filelist:", filelist);
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				log.info("t3-2", "filelist:", filelist);
+				checkFileList("t3-2", filelist, ['foo.js']);
 				next();
 			}
 		], function(err) {
@@ -195,13 +221,8 @@ describe("Testing generator", function() {
 			},
 			function(filelist, next) {
 				log.silly("t4.0-2", "arguments", arguments);
-				log.info("t4.0", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(2);
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				log.info("t4.0-2", "filelist:", filelist);
+				checkFileList("t4.0-2", filelist, [ 'bar.txt', 'foo.js' ]);
 				next();
 			}
 		], function(err) {
@@ -231,13 +252,8 @@ describe("Testing generator", function() {
 			},
 			function(filelist, next) {
 				log.silly("t4.1-2", "arguments", arguments);
-				log.info("t4.1", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(2);
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				log.info("t4.1-2", "filelist:", filelist);
+				checkFileList("t4.1-2", filelist, [ 'bar.txt', 'foo.js' ]);
 				next();
 			}
 		], function(err) {
@@ -270,12 +286,7 @@ describe("Testing generator", function() {
 			function(filelist, next) {
 				log.silly("t4.2-2", "arguments", arguments);
 				log.info("t4.2-2", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(1);
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				checkFileList("t4.2-2", filelist,[ 'bar.txt' ]);
 				next();
 			}
 		], function(err) {
@@ -304,15 +315,8 @@ describe("Testing generator", function() {
 			},
 			function(filelist, next) {
 				log.silly("t5.0-2", "arguments", arguments);
-				log.info("t5.0", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(2);
-				filelist[0].should.equal('dir/bar.txt');
-				filelist[1].should.equal('dir/foo.js');
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				log.info("t5.0-2", "filelist:", filelist);
+				checkFileList("t5.0-2", filelist, ['dir/bar.txt', 'dir/foo.js']);
 				next();
 			}
 		], function(err) {
@@ -342,15 +346,9 @@ describe("Testing generator", function() {
 			},
 			function(filelist, next) {
 				log.silly("t5.1-2", "arguments", arguments);
-				log.info("t5.1", "filelist:", filelist);
+				log.info("t5.1-2", "filelist:", filelist);
 				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(2);
-				filelist[0].should.equal('bar.txt');
-				filelist[1].should.equal('foo.js');
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				checkFileList("t5.1-2", filelist, ['bar.txt', 'foo.js']);
 				next();
 			}
 		], function(err) {
@@ -380,15 +378,8 @@ describe("Testing generator", function() {
 			},
 			function(filelist, next) {
 				log.silly("t5.2-2", "arguments", arguments);
-				log.info("t5.2", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(2);
-				filelist[0].should.equal('superdir/dir/bar.txt');
-				filelist[1].should.equal('superdir/dir/foo.js');
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				log.info("t5.2-2", "filelist:", filelist);
+				checkFileList("t5.2-2", filelist, ['superdir/dir/bar.txt', 'superdir/dir/foo.js']);
 				next();
 			}
 		], function(err) {
@@ -421,15 +412,7 @@ describe("Testing generator", function() {
 			function(filelist, next) {
 				log.silly("t6-2", "arguments", arguments);
 				log.info("t6-2", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(3);
-				filelist[0].should.equal('README.md');
-				filelist[1].should.equal('dir/bar.txt');
-				filelist[2].should.equal('dir/foo.js');
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				checkFileList("t6-2", filelist, ['README.md', 'dir/bar.txt', 'dir/foo.js']);
 				next();
 			}
 		], function(err) {
@@ -459,14 +442,7 @@ describe("Testing generator", function() {
 			function(filelist, next) {
 				log.silly("t7.0-2", "arguments", arguments);
 				log.info("t7.0-2", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(2);
-				filelist[0].should.equal('dir/bar.txt');
-				filelist[1].should.equal('dir/foo.js');
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				checkFileList("t7.0-2", filelist, ['dir/bar.txt', 'dir/foo.js']);
 				next();
 			}
 		], function(err) {
@@ -498,16 +474,7 @@ describe("Testing generator", function() {
 			function(filelist, next) {
 				log.silly("t7.1-2", "arguments", arguments);
 				log.info("t7.1-2", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(4);
-				filelist[0].should.equal('bar.txt');
-				filelist[1].should.equal('foo.js');
-				filelist[2].should.equal('dir/bar.txt');
-				filelist[3].should.equal('dir/foo.js');
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				checkFileList("t7.1-2", filelist, ['bar.txt', 'foo.js', 'dir/bar.txt', 'dir/foo.js']);
 				next();
 			}
 		], function(err) {
@@ -541,16 +508,42 @@ describe("Testing generator", function() {
 			function(filelist, next) {
 				log.silly("t7.2-2", "arguments", arguments);
 				log.info("t7.2-2", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(4);
-				filelist[0].should.equal('bar.txt');
-				filelist[1].should.equal('foo.js');
-				filelist[2].should.equal('dir1/bar.txt');
-				filelist[3].should.equal('dir1/foo.js');
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				checkFileList("t7.2-2", filelist, ['bar.txt', 'foo.js', 'dir1/bar.txt', 'dir1/foo.js']);
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	log.info("t7.3", "---- ");
+	it("t7.3. should generate a project based one folder & one file (exclusion, prefixes)", function(done) {
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				id: "my-id",
+				type: "my-type",
+				description: "my-description",
+				files: [{
+					"url": path.join(__dirname, 'data', 't7'),
+					"prefixToRemove": "dir1",
+					"prefixToAdd": "dir0"
+				}, {
+					"url": path.join(__dirname, '..', 'README.md'),
+					"installAs": "dir3/README.md"
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t7.3-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				log.silly("t7.3-2", "arguments", arguments);
+				log.info("t7.3-2", "filelist:", filelist);
+				checkFileList("t7.3-2", filelist, ['dir0/dir2/bar.txt', 'dir0/dir2/foo.js', 'dir3/README.md']);
 				next();
 			}
 		], function(err) {
@@ -560,7 +553,7 @@ describe("Testing generator", function() {
 	});
 
 	log.info("t8.0", "---- ");
-	it("t8.0. should generate a project based one folder & one file (exclusion, prefixes)", function(done) {
+	it("t8.0. should generate a project with webos-app-config.zip (webos substitutions)", function(done) {
 		var ctx = {};
 		async.waterfall([
 			generator.create.bind(generator, {sources: [{
@@ -568,32 +561,64 @@ describe("Testing generator", function() {
 				type: "my-type",
 				description: "my-description",
 				files: [{
-					"url": path.join(__dirname, 'data', 't8'),
-					"prefixToRemove": "dir1",
-					"prefixToAdd": "dir0"
-				}, {
-					"url": path.join(__dirname, '..', 'README.md'),
-					"installAs": "dir3/README.md"
+					"url": path.join(__dirname, 'data', 't8', 'webos-app-config.zip')
 				}]
 			}]}),
 			function(gen, next) {
 				log.silly("t8.0-1", "arguments", arguments);
 				ctx.gen = gen;
 				ctx.tmpDir = temp.path({prefix: "generator.spec."});
-				ctx.gen.generate(["my-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+				ctx.gen.generate(["my-id"], [{
+					fileRegexp: "appinfo.json",
+					"json": {"vendor": "Your Company", "title": "Your App"}
+				}], ctx.tmpDir /*dest*/, null /*options*/, next);
 			},
 			function(filelist, next) {
 				log.silly("t8.0-2", "arguments", arguments);
 				log.info("t8.0-2", "filelist:", filelist);
-				should.exist(filelist);
-				filelist.should.be.an.instanceOf(Array);
-				filelist.length.should.equal(3);
-				filelist[0].should.equal('dir0/dir2/bar.txt');
-				filelist[1].should.equal('dir0/dir2/foo.js');
-				filelist[2].should.equal('dir3/README.md');
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
+				checkFileList("t8.0-2", filelist, ['appinfo.json',
+								   'debug.html',
+								   'framework_config.json',
+								   'index.html']);
+				var appInfo = JSON.parse(fs.readFileSync(path.join(ctx.tmpDir, 'appinfo.json')));
+				log.info("t8.0-2", "appinfo.json:", appInfo);
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			rimraf(ctx.tmpDir, done);
+		});
+	});
+
+	var appDir = opt.app || "/tmp/bootplate"; // FIXME: os.tmpDir() does not work in mocha...
+	log.info("t9.0", "---- ");
+	it("t9.0. should generate a project based on a local copy of bootplate 2.2 (" + appDir + ")", function(done) {
+		this.timeout(4000);
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				"id": "my-app-id",
+				"type": "template",
+				"description": "Local App",
+				"files": [{
+					"url": appDir,
+					"excluded": [
+						"api",
+						".npmignore"
+					]
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t9.0-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.tmpDir = temp.path({prefix: "generator.spec."});
+				ctx.gen.generate(["my-app-id"], null /*subst*/, ctx.tmpDir /*dest*/, null /*options*/, next);
+			},
+			function(filelist, next) {
+				//log.silly("t9.0-2", "arguments", arguments);
+				log.info("t9.0-2", "filelist.length:", filelist.length);
+				log.info("t9.0-2", "app path:", ctx.tmpDir);
+				checkFileList("t9.0-2", filelist, JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'bootplate-2.2.0-filelist.json'))));
 				next();
 			}
 		], function(err) {
@@ -604,7 +629,7 @@ describe("Testing generator", function() {
 
 	log.info("t10.0", "---- ");
 	it("t10.0. should generate a config based on real-world bootplate-webos", function(done) {
-		this.timeout(60000);
+		this.timeout(20000);
 		var ctx = {};
 		async.waterfall([
 			generator.create.bind(generator, extend({}, configOk)),
@@ -619,9 +644,6 @@ describe("Testing generator", function() {
 				log.info("t10.0-2", "filelist:", filelist);
 				should.exist(filelist);
 				filelist.should.be.an.instanceOf(Array);
-				// XXX each item in filelist should
-				// XXX include only files & be
-				// XXX relative to the desination dir.
 				next();
 			}
 		], function(err) {
