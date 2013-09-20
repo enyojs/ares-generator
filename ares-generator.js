@@ -50,7 +50,7 @@ var fs = require("graceful-fs"),
 		return (!!a) && (a.constructor === String);
 	};
 
-	var dotFiles = new RegExp("(^|/|\\\\)\\.");
+	//var dotFiles = new RegExp("(^|/|\\\\)\\.");
 
 	function Generator(config, next) {
 		if (!isObject(config)) {
