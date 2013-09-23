@@ -569,7 +569,7 @@ var fs = require("graceful-fs"),
 		async.forEachSeries(substits, function(substit, next) {
 			log.silly("_substitute()", "applying substit:", substit);
 			var regexp = new RegExp(substit.fileRegexp);
-			session.fileList.forEach(function(file) {
+			async.forEachSeries(session.fileList, function(file, next) {
 				log.silly("_substitute()", regexp, "matching? file.name:", file.name);
 				if (regexp.test(file.name)) {
 					log.verbose("_substitute()", "matched file:", file);
@@ -581,10 +581,12 @@ var fs = require("graceful-fs"),
 						log.verbose("_substitute()", "Applying VARS substitutions to", file);
 						_applyVarsSubstitutions(file, substit.vars, next);
 					}
+				} else {
+					next();
 				}
-			});
+			}, next);
 		}, next);
-
+		
 		function _applyJsonSubstitutions(file, json, next) {
 			log.verbose("_applyJsonSubstitutions()", "substituting json:", json, "in", file);
 			async.waterfall([
