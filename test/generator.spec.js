@@ -139,7 +139,6 @@ function checkFileList(prefix, val, expected) {
 describe("Testing generator", function() {
 
 	badConfigs.forEach(function(config, i) {
-		log.info("t1", "---- ");
 		it("t1."+ i + ". should fail to instanciate a code generator", function(done) {
 			log.verbose("config:" + util.inspect(config));
 			generator.create(config, function(err, gen) {
@@ -151,7 +150,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t2.0.", "---- ");
 	it("t2.0. should instanciate a code generator (real-world config)", function(done) {
 		generator.create(extend({}, configOk), function(err, gen) {
 			should.not.exist(err);
@@ -160,7 +158,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t2.1", "---- ");
 	it("t2.1. should re-instanciate the same code generator (real-world config)", function(done) {
 		generator.create(extend({}, configOk), function(err, gen) {
 			should.not.exist(err);
@@ -169,7 +166,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t3", "---- ");
 	it("t3. should generate a config based on one file", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -201,7 +197,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t4.0.", "---- ");
 	it("t4.0. should generate a config based on one folder (no exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -231,7 +226,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t4.1.", "---- ");
 	it("t4.1. should generate a config based on one folder (no exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -262,7 +256,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t4.2.", "---- ");
 	it("t4.2. should generate a config based on one folder (with non-empty exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -295,7 +288,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t5.0.", "---- ");
 	it("t5.0. should generate a config based on one sub-folder (no exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -325,7 +317,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t5.1.", "---- ");
 	it("t5.1. should generate a config based on one sub-folder (no exclusion, prefix removed)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -357,7 +348,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t5.2.", "---- ");
 	it("t5.2. should generate a config based on one sub-folder (no exclusion, prefix added)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -388,7 +378,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t6", "---- ");
 	it("t6. should generate a project based on a single file, plus a folder (no exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -421,7 +410,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t7.0", "---- ");
 	it("t7.0. should generate a project based on a single zip-file (no exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -451,7 +439,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t7.1", "---- ");
 	it("t7.1. should generate a project based on a single zip-file (no exclusion)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -483,7 +470,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t7.2", "---- ");
 	it("t7.2. should generate a project based on two zip-files (no exclusion, prefixes)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -517,7 +503,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t7.3", "---- ");
 	it("t7.3. should generate a project based one folder & one file (exclusion, prefixes)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -552,7 +537,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	log.info("t8.0", "---- ");
 	it("t8.0. should generate a project with webos-app-config.zip (webos substitutions)", function(done) {
 		var ctx = {};
 		async.waterfall([
@@ -591,7 +575,6 @@ describe("Testing generator", function() {
 	});
 
 	var appDir = opt.app || "/tmp/bootplate"; // FIXME: os.tmpDir() does not work in mocha...
-	log.info("t9.0", "---- ");
 	it("t9.0. should generate a project based on a local copy of bootplate 2.2 (" + appDir + ")", function(done) {
 		this.timeout(8000);
 		var ctx = {};
