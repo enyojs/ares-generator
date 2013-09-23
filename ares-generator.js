@@ -233,10 +233,15 @@ var fs = require("graceful-fs"),
 				}
 				// return the list of generated files,
 				// relative to the given destination
-				// folder.
-				next(null, session.fileList.map(function(file) {
-					return file.name;
-				}));
+				// folder (if given), otherwise return
+				// the explicit mapping.
+				if (session.destination) {
+					next(null, session.fileList.map(function(file) {
+						return file.name;
+					}));
+				} else {
+					next(null, session.fileList);
+				}
 			});
 
 			function _processSource(source, next) {

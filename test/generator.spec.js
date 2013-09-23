@@ -575,7 +575,7 @@ describe("Testing generator", function() {
 	});
 
 	var appDir = opt.app || "/tmp/bootplate"; // FIXME: os.tmpDir() does not work in mocha...
-	it("t9.0. should generate a project based on a local copy of bootplate 2.2 (" + appDir + ")", function(done) {
+	it("t9.0. should generate a project folder tree based on a local copy of bootplate 2.2  '" + appDir + "'", function(done) {
 		this.timeout(8000);
 		var ctx = {};
 		async.waterfall([
@@ -610,9 +610,42 @@ describe("Testing generator", function() {
 		});
 	});
 
-	process.exit(0); 	// remote access of big temaplates takes too much time in a test suite.
+	it("t9.1. should generate a project file map based on a local copy of bootplate 2.2 '" + appDir + "'", function(done) {
+		this.timeout(8000);
+		var ctx = {};
+		async.waterfall([
+			generator.create.bind(generator, {sources: [{
+				"id": "my-app-id",
+				"type": "template",
+				"description": "Local App",
+				"files": [{
+					"url": appDir,
+					"excluded": [
+						"api",
+						".npmignore"
+					]
+				}]
+			}]}),
+			function(gen, next) {
+				log.silly("t9.1-1", "arguments", arguments);
+				ctx.gen = gen;
+				ctx.gen.generate(["my-app-id"], null /*subst*/, undefined /*dest*/, null /*options*/, next);
+			},
+			function(filemap, next) {
+				//log.silly("t9.1-2", "arguments", arguments);
+				log.info("t9.1-2", "filemap.length:", filemap.length);
+				var filelist = filemap.map(function(file) {
+					return file.name;
+				});
+				checkFileList("t9.1-2", filelist, JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'bootplate-2.2.0-filelist.json'))));
+				next();
+			}
+		], function(err) {
+			should.not.exist(err);
+			done();
+		});
+	});
 
-	log.info("t10.0", "---- ");
 	it("t10.0. should generate a config based on real-world bootplate-webos", function(done) {
 		this.timeout(30000);
 		var ctx = {};
