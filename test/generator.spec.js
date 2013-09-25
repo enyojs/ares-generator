@@ -142,7 +142,7 @@ describe("Testing generator", function() {
 		it("t1."+ i + ". should fail to instanciate a code generator", function(done) {
 			log.verbose("config:" + util.inspect(config));
 			generator.create(config, function(err, gen) {
-				log.verbose("t1"+ i + ".", "err:", err);
+				log.verbose("t1."+ i + ".", "err:", err);
 				should.exist(err);
 				should.not.exist(gen);
 				done();
@@ -631,15 +631,16 @@ describe("Testing generator", function() {
 				ctx.gen = gen;
 				ctx.gen.generate(["my-app-id"], null /*subst*/, undefined /*dest*/, null /*options*/, next);
 			},
-			function(filemap, next) {
+			function(filemap, dir, next) {
 				//log.silly("t9.1-2", "arguments", arguments);
 				log.info("t9.1-2", "filemap.length:", filemap.length);
 				var filelist = filemap.map(function(file) {
 					return file.name;
 				});
 				checkFileList("t9.1-2", filelist, JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'bootplate-2.2.0-filelist.json'))));
-				next();
-			}
+				next(null, dir);
+			},
+			rimraf.bind(this)
 		], function(err) {
 			should.not.exist(err);
 			done();

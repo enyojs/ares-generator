@@ -62,6 +62,7 @@ var fs = require("graceful-fs"),
 			return;
 		}
 		this.config = config;
+		log.level = config.level || 'http';
 		this.objectId = objectCounter++;
 		var sources = {};
 		try {
@@ -209,7 +210,7 @@ var fs = require("graceful-fs"),
 
 			async.waterfall([
 				temp.mkdir.bind(null, {
-					prefix: 'com.enyojs.ares.generator.folder',
+					prefix: 'com.enyojs.ares.generator.',
 					suffix: ".d"
 				}),
 				function(tmpDir, next) {
@@ -219,10 +220,7 @@ var fs = require("graceful-fs"),
 				},		
 				async.forEachSeries.bind(self, sources, _processSource.bind(self)),
 				_substitute.bind(self, session),
-				_realize.bind(self, session),
-				function(next) {
-					rimraf(session.tmpDir, next);
-				}
+				_realize.bind(self, session)
 			], function _notifyCaller(err) {
 				if (err) {
 					// delete tmpDir & trampoline the error
@@ -236,11 +234,20 @@ var fs = require("graceful-fs"),
 				// folder (if given), otherwise return
 				// the explicit mapping.
 				if (session.destination) {
-					next(null, session.fileList.map(function(file) {
-						return file.name;
-					}));
+					// does no longer refer to
+					// anything outside
+					// `destination`: delete
+					// `tmpDir` first
+					rimraf(session.tmpDir, function() {
+						next(null, session.fileList.map(function(file) {
+							return file.name;
+						}));
+					});
 				} else {
-					next(null, session.fileList);
+					// still refers to temporary
+					// files: delete `tmpDir`
+					// later
+					next(null, session.fileList, session.tmpDir);
 				}
 			});
 
