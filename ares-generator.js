@@ -75,18 +75,19 @@ var fs = require("graceful-fs"),
 				    (isArray(source.files))) {
 					sources[source.id] = source;
 					log.verbose("Generator()", "Loaded source:", source);
-				} else if ((typeof source.id === 'string') && (source.type === 'null')) {
+				} else if ((typeof source.id === 'string') && (source.type === null)) {
 					if (sources[source.id]) {
 						delete sources[source.id];
 						log.verbose("Generator()", "Removed source:", source.id);
 					} else {
-						throw new Error("Unable to remove source: " + source.id + " does not exist");
+						log.verbose("Generator()", "No such source to remove '", source.id, "'");
 					}
 				} else {
 					throw new Error("Incomplete source:" + util.inspect(source));
 				}
 			});
 		} catch(err) {
+			log.error("Generator()", "err:", err);
 			generator.setImmediate(next, err);
 			return;
 		}
@@ -161,6 +162,7 @@ var fs = require("graceful-fs"),
 					} else {
 						// option not yet listed: recurse
 						var source = self.config.sources[sourceId];
+						log.silly("generate#_addSources()", " sourceId:", sourceId, "=> source:", source);
 						if (source) {
 							sourcesObject[sourceId] = source;
 							source.deps = source.deps || [];
@@ -172,7 +174,7 @@ var fs = require("graceful-fs"),
 				
 			log.verbose("generate()", "consolidated sourceIds:", Object.keys(sourcesObject));
 
-			// now that sources are uniquelly identified
+			// now that sources are uniquely identified
 			// via object properties, convert them back
 			// into an array for iteration.
 			var sources = Object.keys(sourcesObject).map(function(sourceId) {
