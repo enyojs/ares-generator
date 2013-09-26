@@ -69,21 +69,21 @@ var fs = require("graceful-fs"),
 			log.silly("Generator()", "Checking config.sources:", config.sources);
 			config.sources.forEach(function(source) {
 				log.silly("Generator()", "Checking source:", source);
-				if ((isString(source.id)) && 
-				    (isString(source.type)) && 
-				    (isString(source.description)) &&
-				    (isArray(source.files))) {
-					sources[source.id] = source;
-					log.verbose("Generator()", "Loaded source:", source);
-				} else if ((typeof source.id === 'string') && (source.type === null)) {
+				if ((typeof source.id === 'string') && (source.type === null)) {
 					if (sources[source.id]) {
 						delete sources[source.id];
 						log.verbose("Generator()", "Removed source:", source.id);
 					} else {
 						log.verbose("Generator()", "No such source to remove '", source.id, "'");
 					}
+				} else if ((isString(source.id)) && 
+				    (isString(source.type)) && 
+				    (isString(source.description)) &&
+				    (isArray(source.files))) {
+					sources[source.id] = source;
+					log.verbose("Generator()", "Loaded source:", source);
 				} else {
-					throw new Error("Incomplete source:" + util.inspect(source));
+					throw new Error("Incomplete or invalid source:" + util.inspect(source));
 				}
 			});
 		} catch(err) {
