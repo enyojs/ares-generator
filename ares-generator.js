@@ -262,6 +262,14 @@ var fs = require("graceful-fs"),
 			}
 
 			function _processSourceItem(item, next) {
+				if (!item.url) {
+					// simply ignore entries that
+					// do not have (or have a
+					// commented...) "url"
+					// property.
+					generator.setImmediate(next);
+					return;
+				}
 				if ((path.extname(item.url).toLowerCase() === ".zip") ||
 				    (path.extname(item.alternateUrl).toLowerCase() === ".zip")) {
 					_processZipFile(item, _out);
