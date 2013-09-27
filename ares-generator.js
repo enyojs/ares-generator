@@ -589,7 +589,8 @@ var fs = require("graceful-fs"),
 		async.forEachSeries(substits, function(substit, next) {
 			log.silly("_substitute()", "applying substit:", substit);
 			var regexp = new RegExp(substit.fileRegexp);
-			async.forEachSeries(session.fileList, function(file, next) {
+			// deal with files 10 by 10
+			async.eachLimit(session.fileList, 10, function(file, next) {
 				log.silly("_substitute()", regexp, "matching? file.name:", file.name);
 				if (regexp.test(file.name)) {
 					log.verbose("_substitute()", "matched file:", file);
