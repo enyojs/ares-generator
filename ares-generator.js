@@ -9,12 +9,22 @@ var fs = require("graceful-fs"),
     temp = require("temp"),
     async = require("async"),
     mkdirp = require("mkdirp"),
-    nodezip = require('node-zip'),
+    AdmZip = require("adm-zip"),
     copyFile = require('./copyFile');
 
 (function () {
 
 	var generator = {};
+
+	if (process.platform === 'win32') {
+		generator.normalizePath = function(p) {
+			return p && typeof p === 'string' && p.replace(/\\/g,'/');
+		};
+	} else {
+		generator.normalizePath = function(p) {
+			return p;
+		};
+	}
 
 	if (typeof setImmediate !== 'function') {
 		// 
@@ -353,23 +363,12 @@ var fs = require("graceful-fs"),
 					item: item
 				};
 
-				var _normalize;
-				if (process.platform === 'win32') {
-					_normalize = function(p) {
-						return p && typeof p === 'string' && p.replace(/\\/g,'/');
-					};
-				} else {
-					_normalize = function(p) {
-						return p;
-					};
-				}
-
 				context.fileList = [];
 				context.workDir = item.url;
 				context.destDir = destination;
 
 				async.series([
-					_walk.bind(null, context, ".", item.url),
+					_walkFolder.bind(null, context, ".", item.url),
 					_removeExcludedFiles.bind(self, context),
 					_prefix.bind(self, context)
 				], function _out(err) {
@@ -377,39 +376,6 @@ var fs = require("graceful-fs"),
 					log.silly("generate#_processFolder#_out()", "fileList:", context.fileList);
 					next(err, context.fileList);
 				});
-
-				function _walk(context, dirName, dirPath, next) {
-					//log.silly("generate#_processFolder#_walk()", "arguments:", arguments);
-					async.waterfall([
-						fs.readdir.bind(null, dirPath),
-						function(fileNames, next) {
-							//log.silly("generate#_processFolder#_walk()", "fileNames:", fileNames, "dirPath:", dirPath);
-							async.forEach(fileNames, function(fileName, next) {
-								//log.silly("generate#_processFolder#_walk()", "fileName:", fileName, "dirPath:", dirPath);
-								var filePath = path.join(dirPath, fileName);
-								async.waterfall([
-									fs.stat.bind(null, filePath),
-									function(stat, next) {
-										var name = _normalize(path.join(dirName, fileName));
-										if (stat.isFile()) {
-											context.fileList.push({name: name, path: filePath});
-											generator.setImmediate(next);
-										} else {
-											_walk(context, name, filePath, next);
-										}
-									}
-								], next);
-							}, next);
-						}
-					], function(err) {
-						if (err) {
-							return next(err);
-						}
-						log.silly("generate#_processFolder#_walk()", "fileList.length:", context.fileList.length);
-						//log.silly("generate#_processFolder#_walk()", "fileList:", context.fileList);
-						next();
-					});
-				}
 			}
 		}
 	};
@@ -448,63 +414,41 @@ var fs = require("graceful-fs"),
 
 	function _unzipFile(context, next) {
 		log.silly("Generator#_unzipFile()", context.archive, "=>", context.workDir);
-		var fileList = [];
-		/*
-		 * WARNING: we use `node-zip` & load the entire zip-archive in memory,
-		 * because `node-unzip@0.1.8` streams do not work in `nodejs@0.10`.
-		 * A development branch of `node-unzip@0.1.7` works on nodejs@0.10, but
-		 * not on `nodejs@0.8.x`.
-		 */
+		var zip = new AdmZip(context.archive);
+		zip.extractAllTo(context.workDir);
+		_walkFolder(context, ".", context.workDir, next);
+	}
+
+	function _walkFolder(context, dirName, dirPath, next) {
+		//log.silly("generate#_walkFolder()", "arguments:", arguments);
 		async.waterfall([
-			fs.readFile.bind(fs, context.archive, 'binary'),
-			function(arBuf, next) {
-				log.silly("Generator#_unzipFile()", "zip length:", arBuf.length);
-				var ar;
-				try {
-					ar = new nodezip(arBuf, { base64: false, checkCRC32: false });
-				} catch(err) {
-					next(err);
-					return;
-				}
-				log.silly("Generator#_unzipFile()", 'ar:', util.inspect(Object.keys(ar)));
-				log.silly("Generator#_unzipFile()", 'ar.root:', ar.root);
-				async.forEachSeries(Object.keys(ar.files), function(fileKey, next) {
-					var file = ar.files[fileKey], encoding;
-					log.silly("Generator#_unzipFile()", "file.name:", file.name);
-					log.silly("Generator#_unzipFile()", "file.options:", file.options);
-					var fileName = path.join(context.workDir, file.name);
-					async.series([
-						mkdirp.bind(null, path.dirname(fileName)),
-						function(next) {
-							if (file.options.dir) {
-								log.silly("Generator#_unzipFile()", "mkdir", fileName);
-								fs.mkdir(fileName, next);
+			fs.readdir.bind(null, dirPath),
+			function(fileNames, next) {
+				//log.silly("generate#_walkFolder()", "fileNames:", fileNames, "dirPath:", dirPath);
+				async.forEach(fileNames, function(fileName, next) {
+					//log.silly("generate#_walkFolder()", "fileName:", fileName, "dirPath:", dirPath);
+					var filePath = path.join(dirPath, fileName);
+					async.waterfall([
+						fs.stat.bind(null, filePath),
+						function(stat, next) {
+							var name = generator.normalizePath(path.join(dirName, fileName));
+							if (stat.isFile()) {
+								context.fileList.push({name: name, path: filePath});
+								generator.setImmediate(next);
 							} else {
-								log.silly("Generator#_unzipFile()", "write", fileName);
-								if (file.options.binary) {
-									encoding = 'binary';
-								} else if (file.options.base64) {
-									encoding = 'base64';
-								} else {
-									encoding = 'utf8';
-								}
-								var buf = new Buffer(file.data, encoding);
-								fs.writeFile(fileName, buf, next);
+								_walkFolder(context, name, filePath, next);
 							}
-						},
-						function(next) {
-							if (!file.options.dir) {
-								fileList.push({	path: fileName, name: file.name });
-							}
-							generator.setImmediate(next);
 						}
 					], next);
 				}, next);
 			}
 		], function(err) {
-			log.silly("Generator#_unzipFile()", "fileList:", fileList);
-			context.fileList = fileList;
-			next(err);
+			if (err) {
+				return next(err);
+			}
+			log.silly("generate#_walkFolder()", "fileList.length:", context.fileList.length);
+			//log.silly("generate#_walkFolder()", "fileList:", context.fileList);
+			next();
 		});
 	}
 
