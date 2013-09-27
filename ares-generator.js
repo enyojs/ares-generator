@@ -11,7 +11,7 @@ var fs = require("graceful-fs"),
     mkdirp = require("mkdirp"),
     nodezip = require('node-zip'),
     copyFile = require('./copyFile'),
-	exec = require('child_process').exec;
+    exec = require('child_process').exec;
 
 (function () {
 
@@ -450,7 +450,7 @@ var fs = require("graceful-fs"),
 		 * not on `nodejs@0.8.x`.
 		 */
 		function __unzipNode(next) {
-			if (isExtracted == true) {
+			if (isExtracted === true) {
 				next();
 				return;
 			}
