@@ -125,7 +125,7 @@ var fs = require("graceful-fs"),
 			sourceIds = sourceIds && sourceIds.filter(function(sourceId) {
 				return type && (sources[sourceId].type === type);
 			});
-			log.verbose("Generator#getSource()", "type:", type, "sourceIds:", sourceIds);
+			log.verbose("Generator#getSources()", "type:", type, "sourceIds:", sourceIds);
 			outSources = sourceIds && sourceIds.map(function(sourceId) {
 				var source = sources[sourceId];
 				return {
@@ -136,11 +136,13 @@ var fs = require("graceful-fs"),
 					deps: source.deps || []
 				};
 			});
+			log.silly("Generator#getSources()", "sources:", outSources);
 			generator.setImmediate(next, null, outSources);
 		},
 
 		generate: function(sourceIds, substitutions, destination, options, next) {
 			log.info("generate()", "sourceIds:", sourceIds);
+			log.verbose("generate()", "config.sources:", this.config.sources);
 			var self = this;
 			var session = {
 				fileList: [],
@@ -155,6 +157,7 @@ var fs = require("graceful-fs"),
 			_addSources(sourceIds);
 
 			function _addSources(sourceIds) {
+				log.verbose("generate#_addSources()", "adding sources:", sourceIds);
 				sourceIds.forEach((function(sourceId) {
 					if (sourcesObject[sourceId]) {
 						// option already listed: skip
@@ -172,7 +175,7 @@ var fs = require("graceful-fs"),
 				}));
 			}
 				
-			log.verbose("generate()", "consolidated sourceIds:", Object.keys(sourcesObject));
+			log.info("generate()", "will use sourceIds:", Object.keys(sourcesObject));
 
 			// now that sources are uniquely identified
 			// via object properties, convert them back
