@@ -42,8 +42,6 @@ var fs = require("graceful-fs"),
 		return (!!a) && (a.constructor === String);
 	};
 
-	//var dotFiles = new RegExp("(^|/|\\\\)\\.");
-
 	function Generator(config, next) {
 		if (!isObject(config)) {
 			setImmediate(next, new Error("Invalid configuration:" + config));
@@ -443,11 +441,7 @@ var fs = require("graceful-fs"),
 
 		fileList = fileList.filter(function(file) {
 			var skip = false;
-			// Skipping dotfiles can lead to un-expected
-			// effetcts in node sub-modules...
-			if (false /*dotFiles.test(file.name)*/) {
-				skip = true;
-			} else if (!skip && Array.isArray(excluded)) {
+			if (!skip && Array.isArray(excluded)) {
 				excluded.forEach(function(exclude) {
 					var len = exclude.length;
 					skip = skip || (file.name.substr(0, len) === exclude);
