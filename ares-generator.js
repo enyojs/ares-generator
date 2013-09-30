@@ -32,9 +32,6 @@ var fs = require("graceful-fs"),
 
 	var objectCounter = 0;
 
-	var isArray = Array.isArray || function(a) {
-		return (!!a) && (a.constructor === Array);
-	};
 	var isObject = function(a) {
 		return (!!a) && (a.constructor === Object);
 	};
@@ -47,7 +44,7 @@ var fs = require("graceful-fs"),
 			setImmediate(next, new Error("Invalid configuration:" + config));
 			return;
 		}
-		if (!isArray(config.sources)) {
+		if (!Array.isArray(config.sources)) {
 			setImmediate(next, new Error("Invalid sources:" + config.sources));
 			return;
 		}
@@ -69,7 +66,7 @@ var fs = require("graceful-fs"),
 				} else if ((isString(source.id)) && 
 				    (isString(source.type)) && 
 				    (isString(source.description)) &&
-				    (isArray(source.files))) {
+				    (Array.isArray(source.files))) {
 					sources[source.id] = source;
 					log.verbose("Generator()", "Loaded source:", source);
 				} else {
