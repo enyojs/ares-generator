@@ -1,6 +1,7 @@
 /* global describe,it */
 var path = require("path"),
     fs = require("graceful-fs"),
+    os = require("os"),
     url = require("url"),
     temp = require("temp"),
     log = require('npmlog'),
@@ -574,7 +575,10 @@ describe("Testing generator", function() {
 		});
 	});
 
-	var appDir = opt.app || "/tmp/bootplate"; // FIXME: os.tmpDir() does not work in mocha...
+	var appDir = opt.app || path.join(os.tmpDir(), "bootplate");
+
+	if (fs.existsSync(appDir)) {
+
 	it("t9.0. should generate a project folder tree based on a local copy of bootplate 2.2  '" + appDir + "'", function(done) {
 		this.timeout(8000);
 		var ctx = {};
@@ -609,6 +613,10 @@ describe("Testing generator", function() {
 			rimraf(ctx.tmpDir, done);
 		});
 	});
+
+	} else {
+		log.info("t9.0", "skipping test, no bootplate-2.2 found at folder '" + appDir + "'");
+	}
 
 	it("t9.1. should generate a project file map based on a local copy of bootplate 2.2 '" + appDir + "'", function(done) {
 		this.timeout(8000);

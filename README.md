@@ -17,11 +17,19 @@ npm test
 
 Unit test suite:
 
+First download & unpack bootplate-2.2 under `/tmp` (or the OS equivalent on Windows, see below on how to get the proper location for your OS)
+
+```bash
+curl http://enyojs.com/archive/bootplate-2.2.0.zip > /tmp/bootplate-2.2.0.zip
+cd /tmp
+unzip bootplate-2.2.0.zip
+```
+
 * Run the full test suite using default at default reporting level (error):
   ```bash
   node_modules/.bin/mocha test/generator.spec.js
   ```
-* Run the full test suite using default at info level:
+* Run the full test suite using default at info level (will give you the location where to put bootplate-2.2 for your OS):
   ```bash
   node node_modules/.bin/mocha test/generator.spec.js --level info
   ```
