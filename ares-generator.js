@@ -77,7 +77,6 @@ var fs = require("graceful-fs"),
 				}
 			});
 		} catch(err) {
-			log.error("Generator()", "err:", err);
 			setImmediate(next, err);
 			return;
 		}

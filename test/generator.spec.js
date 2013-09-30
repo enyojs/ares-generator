@@ -614,10 +614,6 @@ describe("Testing generator", function() {
 		});
 	});
 
-	} else {
-		log.info("t9.0", "skipping test, no bootplate-2.2 found at folder '" + appDir + "'");
-	}
-
 	it("t9.1. should generate a project file map based on a local copy of bootplate 2.2 '" + appDir + "'", function(done) {
 		this.timeout(8000);
 		var ctx = {};
@@ -654,6 +650,10 @@ describe("Testing generator", function() {
 			done();
 		});
 	});
+
+	} else {
+		log.info("t9.0", "skipping test, no bootplate-2.2 found at folder '" + appDir + "'");
+	}
 
 	it("t10.0. should generate a config based on real-world bootplate-webos", function(done) {
 		this.timeout(30000);
