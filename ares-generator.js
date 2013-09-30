@@ -26,24 +26,6 @@ var fs = require("graceful-fs"),
 		};
 	}
 
-	if (typeof setImmediate !== 'function') {
-		// 
-		// `setImmediate()` emulation for node<=0.8
-		// 
-		// WARNING: due to `Function#call` signature, we _have
-		// to_ change the _this_ context passed to `next()`.
-		//
-		generator.setImmediate = function(next) {
-			var args =  Array.prototype.slice.call(arguments);
-			args.shift(1);
-			process.nextTick(function() {
-				next.apply(null, args);
-			});
-		};
-	} else {
-		generator.setImmediate = setImmediate;
-	}
-
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = generator;
 	}
@@ -64,11 +46,11 @@ var fs = require("graceful-fs"),
 
 	function Generator(config, next) {
 		if (!isObject(config)) {
-			generator.setImmediate(next, new Error("Invalid configuration:" + config));
+			setImmediate(next, new Error("Invalid configuration:" + config));
 			return;
 		}
 		if (!isArray(config.sources)) {
-			generator.setImmediate(next, new Error("Invalid sources:" + config.sources));
+			setImmediate(next, new Error("Invalid sources:" + config.sources));
 			return;
 		}
 		this.config = config;
@@ -98,13 +80,13 @@ var fs = require("graceful-fs"),
 			});
 		} catch(err) {
 			log.error("Generator()", "err:", err);
-			generator.setImmediate(next, err);
+			setImmediate(next, err);
 			return;
 		}
 		this.config.sources = sources;
 
 		log.info("Generator()", "config:", util.inspect(this.config, {depth: null}));
-		generator.setImmediate(next, null, this);
+		setImmediate(next, null, this);
 	}
 
 	generator.Generator = Generator;
@@ -147,7 +129,7 @@ var fs = require("graceful-fs"),
 				};
 			});
 			log.silly("Generator#getSources()", "sources:", outSources);
-			generator.setImmediate(next, null, outSources);
+			setImmediate(next, null, outSources);
 		},
 
 		generate: function(sourceIds, substitutions, destination, options, next) {
@@ -219,7 +201,7 @@ var fs = require("graceful-fs"),
 			// Do not overwrite the target directory (as a
 			// whole) in case it already exists.
 			if (!options.overwrite && fs.existsSync(destination)) {
-				generator.setImmediate(next, new Error("'" + destination + "' already exists"));
+				setImmediate(next, new Error("'" + destination + "' already exists"));
 				return;
 			}
 
@@ -231,7 +213,7 @@ var fs = require("graceful-fs"),
 				function(tmpDir, next) {
 					session.tmpDir = tmpDir;
 					log.silly("generate()", "session.tmpDir:", session.tmpDir);
-					generator.setImmediate(next);
+					setImmediate(next);
 				},		
 				async.forEachSeries.bind(self, sources, _processSource.bind(self)),
 				_substitute.bind(self, session),
@@ -277,7 +259,7 @@ var fs = require("graceful-fs"),
 					// do not have (or have a
 					// commented...) "url"
 					// property.
-					generator.setImmediate(next);
+					setImmediate(next);
 					return;
 				}
 				if ((path.extname(item.url).toLowerCase() === ".zip") ||
@@ -315,7 +297,7 @@ var fs = require("graceful-fs"),
 
 			function _processFile(item, next) {
 				log.info("generate#_processFile()", "Processing:", item.url);
-				generator.setImmediate(next, null, [{
+				setImmediate(next, null, [{
 					name: item.installAs,
 					path: item.url
 				}]);
@@ -389,12 +371,12 @@ var fs = require("graceful-fs"),
 
 			if (fs.existsSync(url)) {
 				context.archive = url;
-				generator.setImmediate(next);
+				setImmediate(next);
 				return;
 			}
 
 			if (url.substr(0, 4) !== 'http') {
-				generator.setImmediate(next, new Error("Source '" + url + "' does not exists"));
+				setImmediate(next, new Error("Source '" + url + "' does not exists"));
 				return;
 			}
 
@@ -408,7 +390,7 @@ var fs = require("graceful-fs"),
 			);
 		} catch(err) {
 			log.error("Generator#_fetchFile()", err);
-			generator.setImmediate(next, err);
+			setImmediate(next, err);
 		}
 	}
 
@@ -434,7 +416,7 @@ var fs = require("graceful-fs"),
 							var name = generator.normalizePath(path.join(dirName, fileName));
 							if (stat.isFile()) {
 								context.fileList.push({name: name, path: filePath});
-								generator.setImmediate(next);
+								setImmediate(next);
 							} else {
 								_walkFolder(context, name, filePath, next);
 							}
@@ -478,7 +460,7 @@ var fs = require("graceful-fs"),
 		});
 		log.silly("Generator#_removeExcludedFiles()", "output fileList:", fileList);
 		context.fileList = fileList;
-		generator.setImmediate(next);
+		setImmediate(next);
 	}
 
 	function _prefix(context, next) {
@@ -521,7 +503,7 @@ var fs = require("graceful-fs"),
 		// put back into the context
 		log.silly("Generator#_prefix()", "output fileList:", fileList);
 		context.fileList = fileList;
-		generator.setImmediate(next);
+		setImmediate(next);
 	}
 
 	function _substitute(session, next) {
@@ -574,7 +556,7 @@ var fs = require("graceful-fs"),
 						log.silly("_applyJsonSubstitutions()", "update as file:", file);
 						fs.writeFile(file.path, JSON.stringify(content, null, 2), {encoding: 'utf8'}, next);
 					} else {
-						generator.setImmediate(next);
+						setImmediate(next);
 					}
 				}
 			], next);
@@ -611,7 +593,7 @@ var fs = require("graceful-fs"),
 				], next);
 			}, next);
 		} else {
-			generator.setImmediate(next);
+			setImmediate(next);
 		}
 	}
 }());

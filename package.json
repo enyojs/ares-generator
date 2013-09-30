@@ -13,7 +13,7 @@
 		"url" : "http://github.com/enyojs/ares-generator.git"
 	},
 	"engines": {
-		"node": ">=0.8.21",
+		"node": "~0.10.0",
 		"npm": ">=1.2.11"
 	},
 	"engineStrict": true,
