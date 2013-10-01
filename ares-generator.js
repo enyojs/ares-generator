@@ -119,6 +119,7 @@ var fs = require("graceful-fs"),
 					id: source.id,
 					version: source.version,
 					description: source.description,
+					isDefault: source.isDefault || false,
 					deps: source.deps || []
 				};
 			});
