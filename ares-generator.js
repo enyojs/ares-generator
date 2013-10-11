@@ -506,21 +506,22 @@ var fs = require("graceful-fs"),
 		async.forEachSeries(substits, function(substit, next) {
 			log.silly("_substitute()", "applying substit:", substit);
 			var regexp = new RegExp(substit.fileRegexp);
-			// deal with files 10 by 10
-			async.eachLimit(session.fileList, 10, function(file, next) {
+			var fileList = session.fileList.filter(function(file) {
 				log.silly("_substitute()", regexp, "matching? file.name:", file.name);
-				if (regexp.test(file.name)) {
-					log.verbose("_substitute()", "matched file:", file);
-					if (substit.json) {
-						log.verbose("_substitute()", "Applying JSON substitutions to:", file);
-						_applyJsonSubstitutions(file, substit.json, next);
-					}
-					if (substit.vars) {
-						log.verbose("_substitute()", "Applying VARS substitutions to", file);
-						_applyVarsSubstitutions(file, substit.vars, next);
-					}
-				} else {
-					next();
+				return regexp.test(file.name);
+			});
+			// Thanks to js ref-count system, elements of
+			// the subset fileList are also elements of
+			// the original input fileList
+			async.forEach(fileList, function(file, next) {
+				log.verbose("_substitute()", "matched file:", file);
+				if (substit.json) {
+					log.verbose("_substitute()", "Applying JSON substitutions to:", file);
+					_applyJsonSubstitutions(file, substit.json, next);
+				}
+				if (substit.vars) {
+					log.verbose("_substitute()", "Applying VARS substitutions to", file);
+					_applyVarsSubstitutions(file, substit.vars, next);
 				}
 			}, next);
 		}, next);
