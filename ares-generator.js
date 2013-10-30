@@ -200,13 +200,12 @@ var fs = require("graceful-fs"),
 				return;
 			}
 
-			async.waterfall([
-				temp.mkdir.bind(null, {
-					prefix: 'com.enyojs.ares.generator.',
-					suffix: ".d"
-				}),
-				function(tmpDir, next) {
-					session.tmpDir = tmpDir;
+			async.series([
+				function(next) {
+					session.tmpDir = temp.path({prefix: 'com.enyojs.ares.generator.', suffix: '.d'});
+					mkdirp(session.tmpDir, next);
+				},
+				function(next) {
 					log.silly("generate()", "session.tmpDir:", session.tmpDir);
 					setImmediate(next);
 				},		
