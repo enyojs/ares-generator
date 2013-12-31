@@ -514,14 +514,26 @@ var fs = require("graceful-fs"),
 			// the original input fileList
 			async.forEach(fileList, function(file, next) {
 				log.verbose("_substitute()", "matched file:", file);
-				if (substit.json) {
-					log.verbose("_substitute()", "Applying JSON substitutions to:", file);
-					_applyJsonSubstitutions(file, substit.json, next);
-				}
-				if (substit.vars) {
-					log.verbose("_substitute()", "Applying VARS substitutions to", file);
-					_applyVarsSubstitutions(file, substit.vars, next);
-				}
+				async.series([
+					function(next) {
+						if (substit.json) {
+							log.verbose("_substitute()", "applying json substitutions to:", file);
+							_applyJsonSubstitutions(file, substit.json, next);
+						} else {
+							setImmediate(next);
+						}
+					},
+					function(next) {
+						if (substit.vars) {
+							log.verbose("_substitute()", "Applying VARS substitutions to", file);
+							_applyVarsSubstitutions(file, substit.vars, next);
+						} else {
+							setImmediate(next);
+						}
+					}
+				], function(err) {
+					setImmediate(next, err);
+				});
 			}, next);
 		}, next);
 		
@@ -561,10 +573,11 @@ var fs = require("graceful-fs"),
 					Object.keys(changes).forEach(function(key) {
 						var value = changes[key];
 						log.silly("_applyVarsSubstitutions()", "key=" + key + " -> value=" + value);
-						content = content.replace("${" + key + "}", value);
+						var keyword = new RegExp(key, "g");
+						content = content.replace(keyword, value);
 					});
 					file.path = temp.path({dir: session.tmpDir, prefix: "subst.vars."});
-					fs.writeFile(file.path, JSON.stringify(content, null, 2), {encoding: 'utf8'}, next);
+					fs.writeFile(file.path, content, {encoding: 'utf8'}, next);
 				}
 			], next);
 		}
