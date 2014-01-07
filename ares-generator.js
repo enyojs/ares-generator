@@ -596,7 +596,7 @@ var fs = require("graceful-fs"),
 				function(content, next) {
 					Object.keys(changes).forEach(function(key) {
 						var value = changes[key];
-						log.silly("_applyRegexpSubstitutions()", "word=" + key + " -> value=" + value);
+						log.silly("_applyRegexpSubstitutions()", "regexp=" + key + " -> value=" + value);
 						var regExp = new RegExp(key, "g");
 						content = content.replace(regExp, value);
 					});
