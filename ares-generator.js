@@ -530,9 +530,17 @@ var fs = require("graceful-fs"),
 						} else {
 							setImmediate(next);
 						}
+					},
+					function(next) {
+						if (substit.regexp) {
+							log.verbose("_substitute()", "Applying Regexp substitutions to", file);
+							_applyRegexpSubstitutions(file, substit.regexp, next);
+						} else {
+							setImmediate(next);
+						}
 					}
 				], function(err) {
-					setImmediate(next, err);
+					next(err);
 				});
 			}, next);
 		}, next);
@@ -564,7 +572,7 @@ var fs = require("graceful-fs"),
 				}
 			], next);
 		}
-		
+
 		function _applyVarsSubstitutions(file, changes, next) {
 			log.verbose("_applyVarsSubstitutions()", "substituting variables in", file);
 			async.waterfall([
@@ -573,10 +581,26 @@ var fs = require("graceful-fs"),
 					Object.keys(changes).forEach(function(key) {
 						var value = changes[key];
 						log.silly("_applyVarsSubstitutions()", "key=" + key + " -> value=" + value);
-						var keyword = new RegExp(key, "g");
-						content = content.replace(keyword, value);
+						content = content.replace("${" + key + "}", value);
 					});
 					file.path = temp.path({dir: session.tmpDir, prefix: "subst.vars."});
+					fs.writeFile(file.path, content, {encoding: 'utf8'}, next);
+				}
+			], next);
+		}
+
+		function _applyRegexpSubstitutions(file, changes, next) {
+			log.verbose("_applyRegexpSubstitutions()", "substituting word in", file);
+			async.waterfall([
+				fs.readFile.bind(null, file.path, {encoding: 'utf-8'}),
+				function(content, next) {
+					Object.keys(changes).forEach(function(key) {
+						var value = changes[key];
+						log.silly("_applyRegexpSubstitutions()", "word=" + key + " -> value=" + value);
+						var regExp = new RegExp(key, "g");
+						content = content.replace(regExp, value);
+					});
+					file.path = temp.path({dir: session.tmpDir, prefix: "subst.regexp."});
 					fs.writeFile(file.path, content, {encoding: 'utf8'}, next);
 				}
 			], next);
