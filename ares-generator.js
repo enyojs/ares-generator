@@ -555,7 +555,7 @@ var fs = require("graceful-fs"),
 					log.silly("_applyJsonSubstitutions()", "content:", content);
 					var modified, keys = Object.keys(json);
 					keys.forEach(function(key) {
-						if (content.hasOwnProperty(key) || (add && add[key])) {
+						if (content.hasOwnProperty(key) || add[key]) {
 							log.verbose("_applyJsonSubstitutions()", "apply", key, ":", json[key]);
 							content[key] = json[key];
 							modified = true;
