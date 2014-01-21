@@ -518,7 +518,7 @@ var fs = require("graceful-fs"),
 					function(next) {
 						if (substit.json) {
 							log.verbose("_substitute()", "applying json substitutions to:", file);
-							_applyJsonSubstitutions(file, substit.json, next);
+							_applyJsonSubstitutions(file, substit.json, substit.add, next);
 						} else {
 							setImmediate(next);
 						}
@@ -545,7 +545,7 @@ var fs = require("graceful-fs"),
 			}, next);
 		}, next);
 		
-		function _applyJsonSubstitutions(file, json, next) {
+		function _applyJsonSubstitutions(file, json, add, next) {
 			log.verbose("_applyJsonSubstitutions()", "substituting json:", json, "in", file);
 			async.waterfall([
 				fs.readFile.bind(null, file.path, {encoding: 'utf8'}),
@@ -555,7 +555,7 @@ var fs = require("graceful-fs"),
 					log.silly("_applyJsonSubstitutions()", "content:", content);
 					var modified, keys = Object.keys(json);
 					keys.forEach(function(key) {
-						if (content.hasOwnProperty(key)) {
+						if (content.hasOwnProperty(key) || (add && add[key])) {
 							log.verbose("_applyJsonSubstitutions()", "apply", key, ":", json[key]);
 							content[key] = json[key];
 							modified = true;
