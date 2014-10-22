@@ -55,6 +55,7 @@
 		"README.md",
 		"ares-generator.js",
 		"copyFile.js",
+		"copyDir.js",
 		"scripts"
 	]
 }
