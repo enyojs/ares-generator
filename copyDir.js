@@ -2,9 +2,7 @@
 
 module.exports = copySrcToDst;
 
-var fs = require('fs'),
-	path = require('path'),
-	shelljs = require('shelljs'),
+var shelljs = require('shelljs'),
 	Rsync = require('rsync');
 
 function copySrcToDst(src, dst, next) {

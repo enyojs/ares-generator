@@ -639,8 +639,9 @@ var fs = require("graceful-fs"),
 				var symNames = Object.keys(symlinkObj);
 				async.forEachSeries(symNames, function(name, next) {
 					var link = symlinkObj[name];
-					if (!link)
-						return next();
+					if (!link) {
+                        return setImmediate(next);
+                    }
 					try {
 						var stat = fs.lstatSync(link);
 						var symlinkType;
@@ -649,13 +650,16 @@ var fs = require("graceful-fs"),
 						} else if (stat.isFile()) {
 							symlinkType = 'file';
 						}
-						if (!symlinkType) setImmediate(next, new Error("Cannot recognize the file type of " + link));
+						if (!symlinkType) {
+                            return setImmediate(next, new Error("Cannot recognize the file type of " + link));
+                        }
 					} catch (err) {
 						if (err.code === "ENOENT") {
 							setImmediate(next, new Error("Cannot make a symlink for " + link));
 						} else {
 							setImmediate(next, err);
 						}
+                        return;
 					}
 					var dst = path.join(dstDir, name);
 					if (path.basename(path.dirname(path.resolve(dst))) !== path.basename(path.resolve(dstDir))) {
