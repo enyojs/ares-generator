@@ -10,7 +10,7 @@ var fs = require("graceful-fs"),
     async = require("async"),
     mkdirp = require("mkdirp"),
     AdmZip = require("adm-zip"),
-    copyFile = require('./copyFile');
+    copyFile = require('./copyFile'),
     copyDir = require('./copyDir');
 
 (function () {
@@ -670,14 +670,15 @@ var fs = require("graceful-fs"),
 
 						function(next) {
 							if (fs.existsSync(dst)) {
-								next();
+							    setImmediate(next);
 							} else {
 								async.series([
 									fs.symlink.bind(null, link, dst, symlinkType)
 								], function(err, result) {
-									if (err && err.code === 'EPERM')
+									if (err && err.code === 'EPERM') {
 										return copyDir(link, dstDir, next);
-									next(err);
+                                    }
+							        setImmediate(next);
 								});
 							}
 						}
