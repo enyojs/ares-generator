@@ -10,7 +10,8 @@ var fs = require("graceful-fs"),
     async = require("async"),
     mkdirp = require("mkdirp"),
     AdmZip = require("adm-zip"),
-    copyFile = require('./copyFile');
+    copyFile = require('./copyFile'),
+    copyDir = require('./copyDir');
 
 (function () {
 
@@ -133,6 +134,7 @@ var fs = require("graceful-fs"),
 			var self = this;
 			var session = {
 				fileList: [],
+				linkList: [],
 				substitutions: substitutions,
 				destination: destination
 			};
@@ -211,7 +213,8 @@ var fs = require("graceful-fs"),
 				},		
 				async.forEachSeries.bind(self, sources, _processSource.bind(self)),
 				_substitute.bind(self, session),
-				_realize.bind(self, session)
+				_realize.bind(self, session),
+				_symlink.bind(self, session)
 			], function _notifyCaller(err) {
 				if (err) {
 					// delete tmpDir & trampoline the error
@@ -256,6 +259,7 @@ var fs = require("graceful-fs"),
 					setImmediate(next);
 					return;
 				}
+				session.linkList = session.linkList.concat(item.symlink || []);
 				if ((path.extname(item.url).toLowerCase() === ".zip") ||
 				    (path.extname(item.alternateUrl).toLowerCase() === ".zip")) {
 					_processZipFile(item, _out);
@@ -622,6 +626,67 @@ var fs = require("graceful-fs"),
 			}, next);
 		} else {
 			setImmediate(next);
+		}
+	}
+	function _symlink(session, next) {
+		var dstDir = session.destination,
+			linkList = session.linkList;
+		log.verbose("generate#_symlink()", "dstDir:", dstDir, "linkList.length:", linkList.length);
+		async.forEachSeries(linkList, __makeSymlink, next);
+
+		function __makeSymlink(symlinkObj, next) {
+			if (dstDir) {
+				var symNames = Object.keys(symlinkObj);
+				async.forEachSeries(symNames, function(name, next) {
+					var link = symlinkObj[name];
+					if (!link) {
+						return setImmediate(next);
+					}
+					try {
+						var stat = fs.lstatSync(link);
+						var symlinkType;
+						if (stat.isDirectory()) {
+							symlinkType = 'dir';
+						} else if (stat.isFile()) {
+							symlinkType = 'file';
+						}
+						if (!symlinkType) {
+							return setImmediate(next, new Error("Cannot recognize the file type of " + link));
+						}
+					} catch (err) {
+						if (err.code === "ENOENT") {
+							setImmediate(next, new Error("Cannot make a symlink for " + link));
+						} else {
+							setImmediate(next, err);
+						}
+						return;
+					}
+					var dst = path.join(dstDir, name);
+					if (path.basename(path.dirname(path.resolve(dst))) !== path.basename(path.resolve(dstDir))) {
+						mkdirp.sync(path.dirname(path.resolve(dst)));
+					}
+					log.silly('generate#_symlink()', dst, "<-", link);
+					async.series([
+
+						function(next) {
+							if (fs.existsSync(dst)) {
+							    setImmediate(next);
+							} else {
+								async.series([
+									fs.symlink.bind(null, link, dst, symlinkType)
+								], function(err, result) {
+									if (err && err.code === 'EPERM') {
+										return copyDir(link, dstDir, next);
+                                    }
+							        setImmediate(next);
+								});
+							}
+						}
+					], next);
+				}, next);
+			} else {
+				setImmediate(next);
+			}
 		}
 	}
 }());
