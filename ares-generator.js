@@ -394,8 +394,9 @@ var fs = require("graceful-fs"),
 				dir: context.workDir
 			},
 			function(err) {
-				if (err)
+				if (err) {
 					return setImmediate(next, err);
+				}
 				_walkFolder(context, ".", context.workDir, next);
 			}
 		);
