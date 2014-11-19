@@ -19,7 +19,7 @@
 	"engineStrict": true,
 	"os" : [ "darwin", "linux", "win32" ],
 	"dependencies": {
-		"adm-zip": "~0.4.3",
+		"extract-zip": "~1.0.3",
 		"async": "~0.2.9",
 		"graceful-fs": "~2.0.1",
 		"mkdirp": "~0.3.5",
@@ -29,7 +29,7 @@
 		"temp": "~0.6.0"
 	},
 	"bundledDependencies": [
-		"adm-zip",
+		"extract-zip",
 		"async",
 		"graceful-fs",
 		"mkdirp",

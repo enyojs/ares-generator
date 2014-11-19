@@ -9,7 +9,7 @@ var fs = require("graceful-fs"),
     temp = require("temp"),
     async = require("async"),
     mkdirp = require("mkdirp"),
-    AdmZip = require("adm-zip"),
+    extract = require("extract-zip"),
     copyFile = require('./copyFile');
 
 (function () {
@@ -390,9 +390,15 @@ var fs = require("graceful-fs"),
 
 	function _unzipFile(context, next) {
 		log.silly("Generator#_unzipFile()", context.archive, "=>", context.workDir);
-		var zip = new AdmZip(context.archive);
-		zip.extractAllTo(context.workDir);
-		_walkFolder(context, ".", context.workDir, next);
+		extract(context.workDir, {
+				dir: context.workDir
+			},
+			function(err) {
+				if (err)
+					return setImmediate(next, err);
+				_walkFolder(context, ".", context.workDir, next);
+			}
+		);
 	}
 
 	function _walkFolder(context, dirName, dirPath, next) {
