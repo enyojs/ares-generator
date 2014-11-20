@@ -26,7 +26,8 @@
 		"npmlog": "~0.0.4",
 		"request": "~2.26.0",
 		"rimraf": "~2.2.2",
-		"temp": "~0.6.0"
+		"temp": "~0.6.0",
+		"rsync": "^0"
 	},
 	"bundledDependencies": [
 		"extract-zip",
@@ -36,7 +37,8 @@
 		"npmlog",
 		"request",
 		"rimraf",
-		"temp"
+		"temp",
+		"rsync"
 	],
 	"devDependencies": {
 		"mocha": "~1.4.2",
@@ -55,6 +57,7 @@
 		"README.md",
 		"ares-generator.js",
 		"copyFile.js",
+		"copyDir.js",
 		"scripts"
 	]
 }

@@ -283,6 +283,11 @@
       "from": "rimraf@2.2.2",
       "resolved": "https://registry.npmjs.org/rimraf/-/rimraf-2.2.2.tgz"
     },
+    "rsync": {
+      "version": "0.3.0",
+      "from": "rsync@",
+      "resolved": "https://registry.npmjs.org/rsync/-/rsync-0.3.0.tgz"
+    },
     "temp": {
       "version": "0.6.0",
       "from": "temp@0.6.0",
