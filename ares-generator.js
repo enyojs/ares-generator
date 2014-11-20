@@ -10,7 +10,7 @@ var fs = require("graceful-fs"),
     async = require("async"),
     mkdirp = require("mkdirp"),
     extract = require("extract-zip"),
-    copyDir = require('./copyDir');
+    copyDir = require('./copyDir'),
     copyFile = require('./copyFile');
 
 (function () {
