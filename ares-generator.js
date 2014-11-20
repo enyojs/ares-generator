@@ -390,7 +390,7 @@ var fs = require("graceful-fs"),
 
 	function _unzipFile(context, next) {
 		log.silly("Generator#_unzipFile()", context.archive, "=>", context.workDir);
-		extract(context.workDir, {
+		extract(context.archive, {
 				dir: context.workDir
 			},
 			function(err) {
