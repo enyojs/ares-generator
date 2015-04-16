@@ -628,7 +628,20 @@ var fs = require("graceful-fs"),
 				log.silly('generate#_realize()', dst, "<-", file.path);
 				async.series([
 					mkdirp.bind(null, path.dirname(dst)),
-					copyFile.bind(null, file.path, dst)
+					function(next){
+						if(path.extname(file.path) === '.zip'){
+							console.log("unzip the file : ", file.name);
+							extract(file.path, {dir:path.dirname(dst)}, function(err){
+								console.log(path.dirname(dst));
+								if(err){
+									console.log(err);
+								}
+								next();
+							});
+						} else {
+							copyFile(file.path, dst, next);
+						}
+					}
 				], next);
 			}, next);
 		} else {
