@@ -135,6 +135,7 @@ var fs = require("graceful-fs"),
 			var session = {
 				fileList: [],
 				linkList: [],
+				zipList: [],
 				substitutions: substitutions,
 				destination: destination
 			};
@@ -214,6 +215,7 @@ var fs = require("graceful-fs"),
 				async.forEachSeries.bind(self, sources, _processSource.bind(self)),
 				_substitute.bind(self, session),
 				_realize.bind(self, session),
+				_extractZip.bind(self, session),
 				_symlink.bind(self, session)
 			], function _notifyCaller(err) {
 				if (err) {
@@ -260,23 +262,19 @@ var fs = require("graceful-fs"),
 					return;
 				}
 				session.linkList = session.linkList.concat(item.symlink || []);
-				if ((path.extname(item.url).toLowerCase() === ".zip") ||
-				    (path.extname(item.alternateUrl).toLowerCase() === ".zip")) {
-					_processZipFile(item, _out);
-				} else {
-					fs.stat(item.url, function(err, stats) {
-						if (err) {
-							_out(err);
-						} else if (stats.isDirectory()) {
-							_processFolder(item, _out);
-						} else if (stats.isFile()){
-							_processFile(item, _out);
-						} else {
-							next(new Error("Don't know how to handle '" + item.url + "'"));
-						}
-					});
-				}
-
+				session.zipList = session.zipList.concat(item.zip || []);
+				fs.stat(item.url, function(err, stats) {
+					if (err) {
+						_out(err);
+					} else if (stats.isDirectory()) {
+						_processFolder(item, _out);
+					} else if (stats.isFile()){
+						_processFile(item, _out);
+					} else {
+						next(new Error("Don't know how to handle '" + item.url + "'"));
+					}
+				});
+				
 				function _out(err, fileList) {
 					log.silly("generate#_processSourceItem#_out()", "arguments:", arguments);
 					if (err) {
@@ -633,6 +631,33 @@ var fs = require("graceful-fs"),
 			}, next);
 		} else {
 			setImmediate(next);
+		}
+	}
+	function _extractZip(session, next){
+		var dstDir = session.destination,
+			zipList = session.zipList;
+
+		log.verbose("generate#_extractZip()", "dstDir:", dstDir, "zipList.length:", zipList.length);
+		async.forEachSeries(zipList, __extractZipList, next);
+
+		function __extractZipList(zipListObj, next){
+			if(!dstDir){
+				setImmediate(next);
+			} else {
+				var zipNames = Object.keys(zipListObj);
+				async.forEachSeries(zipNames, function(name, next){
+					var zipFile = zipListObj[name];
+					if(!fs.existsSync(zipFile)){
+						setImmediate(next, new Error("Cannot find the archive file : " + zipFile));
+					} else {
+						console.log("Extracting archive file (" + path.basename(zipFile) + ")...");
+						extract(zipFile, {dir: dstDir}, 
+							function(err) {
+									return setImmediate(next, err);
+							});
+					}
+				}, next);
+			}
 		}
 	}
 	function _symlink(session, next) {
